@@ -151,14 +151,14 @@ rules: {
 ```
 
 Почему `error`, а не `warn`: `warn` не останавливает — на него научаются
-закрывать глаза за неделю. `error` ломает `npm run lint`, а значит ломает CI.
+закрывать глаза за неделю. `error` ломает `pnpm run lint`, а значит ломает CI.
 Именно так рос предыдущий монолит: ни один отдельный PR не выглядел как
 раздутие.
 
 1. **Pre-commit hook (husky + lint-staged)** — превышение лимита не попадает в
    git вообще, а не ловится на code review постфактум.
    ```bash
-   npx husky add .husky/pre-commit "npx lint-staged"
+   npx husky add .husky/pre-commit "pnpm exec lint-staged"
    # lint-staged: { "*.ts": ["eslint --max-warnings=0"] }
    ```
 2. **Тот же линт — обязательный шаг CI**, не только локальный hook. Hook можно
