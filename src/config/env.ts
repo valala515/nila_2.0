@@ -1,0 +1,27 @@
+import { z } from 'zod';
+
+const envSchema = z.object({
+  TELEGRAM_BOT_TOKEN: z.string().min(1, 'TELEGRAM_BOT_TOKEN is required'),
+  OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
+  DATABASE_PATH: z.string().min(1).default('./data/nila.sqlite'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+/**
+ * SPEC: loadEnv
+ * Назначение: провалидировать переменные окружения при старте процесса
+ * Входы/Выход: process.env → типизированный Env, либо процесс не стартует
+ * Разрешённые side effects: process.exit(1) при невалидной конфигурации
+ * Инварианты: любой другой модуль импортирует Env, а не process.env напрямую
+ */
+export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
+  const result = envSchema.safeParse(source);
+  if (!result.success) {
+    console.error('Invalid environment configuration:');
+    console.error(result.error.format());
+    process.exit(1);
+  }
+  return result.data;
+}
