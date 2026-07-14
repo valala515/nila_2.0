@@ -28,6 +28,6 @@ export async function processUserUtterance(
     tone,
     createdAtIso: new Date().toISOString(),
   };
-  await deps.turnRepository.save(turn);
-  return turn;
+  const id = await deps.turnRepository.save(turn);
+  return { ...turn, id };
 }

@@ -19,6 +19,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@sentry/node": "^10.65.0",
     "better-sqlite3": "^12.11.1",
     "grammy": "^1.44.0",
     "openai": "^6.46.0",

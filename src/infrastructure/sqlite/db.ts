@@ -15,6 +15,11 @@ export function createDatabase(path: string): Database.Database {
       tone TEXT NOT NULL,
       created_at_iso TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS profiles (
+      user_id TEXT PRIMARY KEY,
+      profile_json TEXT NOT NULL,
+      updated_at_iso TEXT NOT NULL
+    );
   `);
   return db;
 }

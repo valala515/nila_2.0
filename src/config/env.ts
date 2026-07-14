@@ -5,6 +5,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
   DATABASE_PATH: z.string().min(1).default('./data/nila.sqlite'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  GLITCHTIP_DSN: z.string().optional().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;
