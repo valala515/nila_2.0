@@ -18,6 +18,7 @@ export async function processUserUtterance(
   userId: string,
   text: string,
   channel: TurnChannel,
+  sessionId: number,
   deps: ProcessUserUtteranceDeps,
 ): Promise<TurnRecord> {
   const tone = await deps.toneAnalysis.analyzeTone(text);
@@ -28,6 +29,6 @@ export async function processUserUtterance(
     tone,
     createdAtIso: new Date().toISOString(),
   };
-  const id = await deps.turnRepository.save(turn);
+  const id = await deps.turnRepository.save(turn, sessionId);
   return { ...turn, id };
 }

@@ -4,6 +4,7 @@ import {
   applyInterviewUpdate,
   createEmptyProfile,
   onlyDemographicFieldsRemaining,
+  fieldsTransitionedToKnown,
   type InterviewProfile,
 } from '../../src/domain/interviewProfile.js';
 
@@ -115,4 +116,27 @@ test('signals to ask demographics directly once only age/gender/weight remain mi
 test('does not signal demographics-only while a non-demographic intro field is still missing', () => {
   const profile = createEmptyProfile('user-1');
   assert.equal(onlyDemographicFieldsRemaining(profile, 'intro'), false);
+});
+
+test('fieldsTransitionedToKnown reports only fields that newly became known', () => {
+  const before = createEmptyProfile('user-1');
+  const { profile: after } = applyInterviewUpdate(before, {
+    fields: [
+      { key: 'mainConcern', status: 'known', value: 'back pain', confidence: 0.9 },
+      { key: 'goal', status: 'missing' },
+    ],
+    openThreads: [],
+  });
+
+  assert.deepEqual(fieldsTransitionedToKnown(before, after), ['mainConcern']);
+});
+
+test('fieldsTransitionedToKnown ignores a field that was already known before this turn', () => {
+  const before = profileWithKnownGoal('lose weight');
+  const { profile: after } = applyInterviewUpdate(before, {
+    fields: [{ key: 'goal', status: 'known', value: 'lose weight', confidence: 0.95 }],
+    openThreads: [],
+  });
+
+  assert.deepEqual(fieldsTransitionedToKnown(before, after), []);
 });

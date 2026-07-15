@@ -6,6 +6,9 @@ const envSchema = z.object({
   DATABASE_PATH: z.string().min(1).default('./data/nila.sqlite'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   GLITCHTIP_DSN: z.string().optional().default(''),
+  DASHBOARD_TOKEN: z.string().min(1, 'DASHBOARD_TOKEN is required'),
+  DASHBOARD_PORT: z.coerce.number().int().positive().default(3001),
+  DASHBOARD_STATIC_DIR: z.string().min(1).default('./dashboard/dist'),
 });
 
 export type Env = z.infer<typeof envSchema>;

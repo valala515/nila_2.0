@@ -176,6 +176,21 @@ function isContradictingKnownField(existing: ProfileField | undefined, incoming:
  *   не блокируют, поле остаётся known со старым значением до ответа пользователя.
  * Запрещено: перезаписывать known-поле без явного подтверждения пользователя.
  */
+/**
+ * SPEC: fieldsTransitionedToKnown
+ * Назначение: назвать поля, которые именно на этом ходу стали known — единица
+ *   funnel-анализа "какое поле/тема раскрылись на этом ходу" (см. дашборд,
+ *   docs/domain-glossary.md).
+ * Входы/Выход: профиль до и после merge → ключи полей, ставших known
+ * Разрешённые side effects: нет (чистая функция)
+ */
+export function fieldsTransitionedToKnown(before: InterviewProfile, after: InterviewProfile): ProfileFieldKey[] {
+  const statusBefore = new Map(before.fields.map((field) => [field.key, field.status]));
+  return after.fields
+    .filter((field) => field.status === 'known' && statusBefore.get(field.key) !== 'known')
+    .map((field) => field.key);
+}
+
 export function applyInterviewUpdate(current: InterviewProfile, update: ProfileUpdate): MergeResult {
   const contradictions: ProfileField[] = [];
   const fieldsByKey = new Map(current.fields.map((field) => [field.key, field]));

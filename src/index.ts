@@ -11,7 +11,14 @@ import { createCheckpointReflection } from './infrastructure/openai/checkpointRe
 import { createDatabase } from './infrastructure/sqlite/db.js';
 import { createTurnRepository } from './infrastructure/sqlite/turnRepository.js';
 import { createInterviewProfileRepository } from './infrastructure/sqlite/interviewProfileRepository.js';
+import { createAnalyticsEventRepository } from './infrastructure/sqlite/analyticsEventRepository.js';
+import { createPendingFeedbackRepository } from './infrastructure/sqlite/pendingFeedbackRepository.js';
+import { createAnalyticsRepository } from './infrastructure/sqlite/analyticsRepository.js';
+import { createUserResetRepository } from './infrastructure/sqlite/userResetRepository.js';
+import { createSessionRepository } from './infrastructure/sqlite/sessionRepository.js';
+import { createConversationsRepository } from './infrastructure/sqlite/conversationsRepository.js';
 import { registerTelegramHandlers } from './transport/telegramHandlers.js';
+import { createDashboardApi } from './transport/dashboardApi.js';
 
 const env = loadEnv();
 initErrorTracking(env);
@@ -26,21 +33,45 @@ console.log(`Nila bot starting — build ${BUILD_VERSION}`);
 const bot = createTelegramBot(env.TELEGRAM_BOT_TOKEN);
 const openAiClient = createOpenAiClient(env.OPENAI_API_KEY);
 const db = createDatabase(env.DATABASE_PATH);
+const analyticsEvent = createAnalyticsEventRepository(db);
+const interviewProfileRepository = createInterviewProfileRepository(db);
+const pendingFeedback = createPendingFeedbackRepository(db);
+const session = createSessionRepository(db);
 
 registerTelegramHandlers(bot, {
   messaging: createMessagingPort(bot),
   voiceDownload: createVoiceDownloadPort(bot),
-  speechToText: createSpeechToText(openAiClient),
+  speechToText: createSpeechToText(openAiClient, analyticsEvent),
   toneAnalysis: createToneAnalyzer(openAiClient),
   turnRepository: createTurnRepository(db),
-  interviewEngine: createInterviewEngine(openAiClient),
-  interviewProfileRepository: createInterviewProfileRepository(db),
-  checkpointReflection: createCheckpointReflection(openAiClient),
+  interviewEngine: createInterviewEngine(openAiClient, analyticsEvent),
+  interviewProfileRepository,
+  checkpointReflection: createCheckpointReflection(openAiClient, analyticsEvent),
+  analyticsEvent,
+  pendingFeedback,
+  session,
 });
 
 bot.catch((err) => {
   console.error('Unhandled bot error:', err.message);
   Sentry.captureException(err.error);
+});
+
+const dashboardApi = createDashboardApi({
+  analyticsQuery: createAnalyticsRepository(db),
+  conversationsQuery: createConversationsRepository(db),
+  userHistory: {
+    interviewProfileRepository,
+    pendingFeedback,
+    session,
+    userReset: createUserResetRepository(db),
+    analyticsEvent,
+  },
+  token: env.DASHBOARD_TOKEN,
+  staticDir: env.DASHBOARD_STATIC_DIR,
+});
+dashboardApi.listen(env.DASHBOARD_PORT, () => {
+  console.log(`Dashboard API listening on port ${env.DASHBOARD_PORT}`);
 });
 
 await bot.start();

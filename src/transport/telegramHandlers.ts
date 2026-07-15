@@ -7,10 +7,14 @@ import type { TurnRepository } from '../application/ports/turnRepository.js';
 import type { InterviewEnginePort } from '../application/ports/interviewEnginePort.js';
 import type { InterviewProfileRepository } from '../application/ports/interviewProfileRepository.js';
 import type { CheckpointReflectionPort } from '../application/ports/checkpointReflectionPort.js';
+import type { AnalyticsEventPort } from '../application/ports/analyticsEventPort.js';
+import type { PendingFeedbackRepository } from '../application/ports/pendingFeedbackRepository.js';
+import type { SessionPort } from '../application/ports/sessionPort.js';
 import type { InterviewProfile } from '../domain/interviewProfile.js';
 import { startInterviewSession } from '../domain/interviewSession.js';
 import { buildGreeting } from '../application/useCases/greetNewUser.js';
 import { advanceInterview } from '../application/useCases/advanceInterview.js';
+import { collectInterviewFeedback } from '../application/useCases/collectInterviewFeedback.js';
 
 export interface TelegramHandlerDependencies {
   messaging: MessagingPort;
@@ -21,6 +25,9 @@ export interface TelegramHandlerDependencies {
   interviewEngine: InterviewEnginePort;
   interviewProfileRepository: InterviewProfileRepository;
   checkpointReflection: CheckpointReflectionPort;
+  analyticsEvent: AnalyticsEventPort;
+  pendingFeedback: PendingFeedbackRepository;
+  session: SessionPort;
 }
 
 // Только ключи и статусы (known/missing/deferred) — без values и evidence-quote,
@@ -33,8 +40,12 @@ function formatCompletenessSummary(profile: InterviewProfile): string {
 export function registerTelegramHandlers(bot: Bot, deps: TelegramHandlerDependencies): void {
   bot.command('start', async (ctx) => {
     const userId = String(ctx.from?.id ?? ctx.chat.id);
-    const session = startInterviewSession(userId);
-    await deps.messaging.sendText(String(ctx.chat.id), buildGreeting(session));
+    const interviewSession = startInterviewSession(userId);
+    const greeting = buildGreeting(interviewSession);
+    await deps.analyticsEvent.record('interview_started', userId, {});
+    const sessionId = await deps.session.openNewSession(userId);
+    await deps.session.recordBotMessage(sessionId, userId, greeting);
+    await deps.messaging.sendText(String(ctx.chat.id), greeting);
   });
 
   bot.command('profile', async (ctx) => {
@@ -46,15 +57,24 @@ export function registerTelegramHandlers(bot: Bot, deps: TelegramHandlerDependen
 
   bot.on('message:text', async (ctx) => {
     const userId = String(ctx.from?.id ?? ctx.chat.id);
-    const { replyText } = await advanceInterview(userId, ctx.message.text, 'text', deps);
+    const pendingFeedbackKind = await deps.pendingFeedback.getPending(userId);
+    const replyText = pendingFeedbackKind
+      ? await collectInterviewFeedback(userId, ctx.message.text, 'text', pendingFeedbackKind, deps)
+      : (await advanceInterview(userId, ctx.message.text, 'text', deps)).replyText;
     await deps.messaging.sendText(String(ctx.chat.id), replyText);
   });
 
   bot.on('message:voice', async (ctx) => {
     const userId = String(ctx.from?.id ?? ctx.chat.id);
     const audio = await deps.voiceDownload.download(ctx.message.voice.file_id);
-    const text = await deps.speechToText.transcribe(audio.buffer, audio.mimeType);
-    const { replyText } = await advanceInterview(userId, text, 'voice', deps);
+    const text = await deps.speechToText.transcribe(audio.buffer, audio.mimeType, {
+      userId,
+      audioDurationSec: ctx.message.voice.duration,
+    });
+    const pendingFeedbackKind = await deps.pendingFeedback.getPending(userId);
+    const replyText = pendingFeedbackKind
+      ? await collectInterviewFeedback(userId, text, 'voice', pendingFeedbackKind, deps)
+      : (await advanceInterview(userId, text, 'voice', deps)).replyText;
     await deps.messaging.sendText(String(ctx.chat.id), replyText);
   });
 }

@@ -6,7 +6,11 @@ import {
   type ProfileFieldKey,
 } from '../../domain/interviewProfile.js';
 import type { InterviewEnginePort } from '../../application/ports/interviewEnginePort.js';
+import type { AnalyticsEventPort } from '../../application/ports/analyticsEventPort.js';
+import { estimateLlmCostUsd } from '../../domain/costEstimate.js';
 import { loadPrompt } from '../prompts/loadPrompt.js';
+
+const MODEL = 'gpt-4o-mini';
 
 const FIELD_KEYS = PROFILE_FIELD_CATALOG.map((field) => field.key) as [ProfileFieldKey, ...ProfileFieldKey[]];
 
@@ -35,7 +39,7 @@ const FALLBACK_QUESTION = "Could you tell me a bit more? I want to make sure I u
 
 const SYSTEM_PROMPT = loadPrompt('interviewEngine.v4.md');
 
-export function createInterviewEngine(client: OpenAI): InterviewEnginePort {
+export function createInterviewEngine(client: OpenAI, analyticsEvent: AnalyticsEventPort): InterviewEnginePort {
   return {
     async advance({ userAnswer, profile, recentTurns, tone }) {
       const context = {
@@ -49,13 +53,25 @@ export function createInterviewEngine(client: OpenAI): InterviewEnginePort {
         latestAnswer: userAnswer,
       };
 
+      const startedAt = Date.now();
       const completion = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: JSON.stringify(context) },
         ],
         response_format: { type: 'json_object' },
+      });
+
+      const promptTokens = completion.usage?.prompt_tokens ?? 0;
+      const completionTokens = completion.usage?.completion_tokens ?? 0;
+      await analyticsEvent.record('llm_call_completed', profile.userId, {
+        useCase: 'interviewEngine',
+        model: MODEL,
+        latencyMs: Date.now() - startedAt,
+        promptTokens,
+        completionTokens,
+        estimatedCostUsd: estimateLlmCostUsd(MODEL, promptTokens, completionTokens),
       });
 
       const raw = completion.choices[0]?.message.content ?? '{}';

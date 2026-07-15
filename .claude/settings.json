@@ -19,7 +19,15 @@
       "mcp__chrome-devtools__list_network_requests",
       "mcp__sentry__find_projects",
       "mcp__chrome-devtools__get_console_message",
-      "Bash(open *)"
+      "Bash(open *)",
+      "Bash(pnpm run lint *)",
+      "Bash(pnpm run depcruise *)",
+      "Bash(pnpm run build *)",
+      "Bash(npx tsc -p tsconfig.json --noEmit)",
+      "Bash(pnpm test *)",
+      "Bash(node --test --import tsx tests/unit/*.test.ts tests/integration/*.test.ts)",
+      "mcp__chrome-devtools__fill",
+      "mcp__chrome-devtools__click"
     ]
   }
 }

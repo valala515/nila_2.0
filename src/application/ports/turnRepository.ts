@@ -2,8 +2,10 @@ import type { TurnRecord } from '../../domain/turnRecord.js';
 
 export interface TurnRepository {
   /** @returns id сохранённого хода (используется как ссылка из OpenThread) */
-  save(turn: TurnRecord): Promise<number>;
+  save(turn: TurnRecord, sessionId: number): Promise<number>;
   // role filter: user only — таблица turns хранит только реплики пользователя,
-  // ответы бота в неё не пишутся.
-  listRecent(userId: string, limit: number): Promise<TurnRecord[]>;
+  // ответы бота пишутся в bot_messages (см. SessionPort).
+  listRecent(sessionId: number, limit: number): Promise<TurnRecord[]>;
+  /** Порядковый номер хода пользователя в этой сессии (1-based) — единица funnel "по ходу". */
+  countForSession(sessionId: number): Promise<number>;
 }

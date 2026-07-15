@@ -38,6 +38,7 @@ function buildDeps(overrides: {
     turnRepository: {
       save: async () => 1,
       listRecent: async () => [],
+      countForSession: async () => 1,
     },
     interviewEngine: { advance: async () => overrides.engineResult },
     interviewProfileRepository: {
@@ -49,6 +50,18 @@ function buildDeps(overrides: {
         overrides.reflectCalls.push({ profile, recentTurns });
         return 'CHECKPOINT_REFLECTION_TEXT';
       },
+    },
+    analyticsEvent: { record: async () => {} },
+    pendingFeedback: {
+      setPending: async () => {},
+      getPending: async () => null,
+      clearPending: async () => {},
+    },
+    session: {
+      getOrOpenCurrentSession: async () => 1,
+      openNewSession: async () => 1,
+      recordUserTurn: async () => {},
+      recordBotMessage: async () => {},
     },
   };
 }
