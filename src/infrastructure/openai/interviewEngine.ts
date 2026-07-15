@@ -1,6 +1,10 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
-import { PROFILE_FIELD_CATALOG, type ProfileFieldKey } from '../../domain/interviewProfile.js';
+import {
+  PROFILE_FIELD_CATALOG,
+  onlyDemographicFieldsRemaining,
+  type ProfileFieldKey,
+} from '../../domain/interviewProfile.js';
 import type { InterviewEnginePort } from '../../application/ports/interviewEnginePort.js';
 import { loadPrompt } from '../prompts/loadPrompt.js';
 
@@ -12,6 +16,7 @@ const fieldSchema = z.object({
   value: z.string().optional(),
   confidence: z.number().min(0).max(1).optional(),
   evidenceQuote: z.string().optional(),
+  isContradiction: z.boolean().optional(),
 });
 
 const openThreadSchema = z.object({
@@ -28,13 +33,16 @@ const responseSchema = z.object({
 
 const FALLBACK_QUESTION = "Could you tell me a bit more? I want to make sure I understood you correctly.";
 
-const SYSTEM_PROMPT = loadPrompt('interviewEngine.v1.md');
+const SYSTEM_PROMPT = loadPrompt('interviewEngine.v4.md');
 
 export function createInterviewEngine(client: OpenAI): InterviewEnginePort {
   return {
     async advance({ userAnswer, profile, recentTurns, tone }) {
       const context = {
         currentFields: profile.fields,
+        currentPhase: profile.currentPhase,
+        activeFields: PROFILE_FIELD_CATALOG.filter((field) => field.phase === profile.currentPhase),
+        askDemographicsDirectly: onlyDemographicFieldsRemaining(profile, profile.currentPhase),
         openThreads: profile.openThreads,
         recentTurns: recentTurns.map((turn) => ({ id: turn.id, text: turn.text, tone: turn.tone })),
         latestTone: tone,
@@ -71,6 +79,7 @@ export function createInterviewEngine(client: OpenAI): InterviewEnginePort {
           ...(field.value !== undefined && { value: field.value }),
           ...(field.confidence !== undefined && { confidence: field.confidence }),
           ...(field.evidenceQuote !== undefined && { evidenceQuote: field.evidenceQuote }),
+          ...(field.isContradiction !== undefined && { isContradiction: field.isContradiction }),
         })),
         openThreads: parsed.data.openThreads,
         nextQuestion: parsed.data.nextQuestion,

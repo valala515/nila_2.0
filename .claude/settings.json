@@ -12,10 +12,14 @@
       "Bash(npm run build)",
       "Bash(npm run depcruise)",
       "Bash(npx tsc --noEmit -p tsconfig.json)",
+      "Bash(pnpm run lint)",
+      "Bash(pnpm run build)",
+      "Bash(pnpm run depcruise)",
       "mcp__chrome-devtools__list_console_messages",
       "mcp__chrome-devtools__list_network_requests",
       "mcp__sentry__find_projects",
-      "mcp__chrome-devtools__get_console_message"
+      "mcp__chrome-devtools__get_console_message",
+      "Bash(open *)"
     ]
   }
 }

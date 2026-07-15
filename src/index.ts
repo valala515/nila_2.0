@@ -7,6 +7,7 @@ import { createOpenAiClient } from './infrastructure/openai/client.js';
 import { createSpeechToText } from './infrastructure/openai/speechToText.js';
 import { createToneAnalyzer } from './infrastructure/openai/toneAnalyzer.js';
 import { createInterviewEngine } from './infrastructure/openai/interviewEngine.js';
+import { createCheckpointReflection } from './infrastructure/openai/checkpointReflection.js';
 import { createDatabase } from './infrastructure/sqlite/db.js';
 import { createTurnRepository } from './infrastructure/sqlite/turnRepository.js';
 import { createInterviewProfileRepository } from './infrastructure/sqlite/interviewProfileRepository.js';
@@ -34,6 +35,7 @@ registerTelegramHandlers(bot, {
   turnRepository: createTurnRepository(db),
   interviewEngine: createInterviewEngine(openAiClient),
   interviewProfileRepository: createInterviewProfileRepository(db),
+  checkpointReflection: createCheckpointReflection(openAiClient),
 });
 
 bot.catch((err) => {

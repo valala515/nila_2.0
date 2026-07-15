@@ -9,12 +9,14 @@ import {
 import type { TurnChannel } from '../../domain/turnRecord.js';
 import type { InterviewEnginePort } from '../ports/interviewEnginePort.js';
 import type { InterviewProfileRepository } from '../ports/interviewProfileRepository.js';
+import type { CheckpointReflectionPort } from '../ports/checkpointReflectionPort.js';
 
 const RECENT_TURNS_LIMIT = 6;
 
 export interface AdvanceInterviewDeps extends ProcessUserUtteranceDeps {
   interviewEngine: InterviewEnginePort;
   interviewProfileRepository: InterviewProfileRepository;
+  checkpointReflection: CheckpointReflectionPort;
 }
 
 export interface AdvanceInterviewResult {
@@ -37,10 +39,15 @@ function buildContradictionQuestion(oldValue: string, newValue: string, fieldKey
  * Входы/Выход: userId, текст, канал → { replyText, profile }
  * Разрешённые side effects: сохранение хода (через processUserUtterance),
  *   сохранение профиля (InterviewProfileRepository), console.warn с id хода
- *   (без текста) при flaggedForReview — заглушка ручного review до Sprint 2.
+ *   (без текста) при flaggedForReview — заглушка ручного review до Sprint 2,
+ *   вызов CheckpointReflectionPort на переходе impact → history.
  * Инварианты: known-поле не перезаписывается молча при расхождении —
  *   applyInterviewUpdate решает это; при расхождении вопрос от interview
- *   engine переопределяется явным уточнением.
+ *   engine переопределяется явным уточнением (приоритет выше checkpoint).
+ *   Ровно на ходу, где currentPhase меняется с 'impact' на 'history', вместо
+ *   обычного nextQuestion от engine возвращается checkpoint-отражение —
+ *   единое сообщение (reflection + переход в первый вопрос history), не два
+ *   сообщения подряд.
  * Запрещено: логировать text/value полей за пределами processUserUtterance/
  *   InterviewProfileRepository (CLAUDE.md §5).
  */
@@ -83,6 +90,12 @@ export async function advanceInterview(
       replyText: buildContradictionQuestion(oldValue, conflict.value ?? '', conflict.key),
       profile: mergedProfile,
     };
+  }
+
+  const enteredHistoryPhase = profile.currentPhase === 'impact' && mergedProfile.currentPhase === 'history';
+  if (enteredHistoryPhase) {
+    const replyText = await deps.checkpointReflection.reflect(mergedProfile, recentTurns);
+    return { replyText, profile: mergedProfile };
   }
 
   return { replyText: result.nextQuestion, profile: mergedProfile };

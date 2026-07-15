@@ -1,17 +1,57 @@
 // Product-facing content (English — end users are English-speaking, see CLAUDE.md).
+// Каждое поле помечено фазой интервью (см. InterviewPhase) — так собираем
+// глубокий профиль постепенно за несколько ходов, а не одним допросом.
+// 'synthesis' полей не имеет — это финальный шаг (Future You brief,
+// см. docs/domain-glossary.md), отдельный от per-turn извлечения фактов.
 export const PROFILE_FIELD_CATALOG = [
-  { key: 'mainConcern', description: 'the main concern the user came in with' },
-  { key: 'goal', description: 'what the user wants to achieve' },
-  { key: 'durationOrFrequency', description: 'how long this has been going on or how often it happens' },
-  { key: 'severityOrImpact', description: 'how much this affects daily life' },
-  { key: 'triedSoFar', description: 'what the user has already tried' },
-  { key: 'preferredSupportStyle', description: 'how the user prefers to receive support' },
+  // intro — presenting problem + базовые демографические данные
+  { key: 'mainConcern', description: 'the main concern the user came in with', phase: 'intro' },
+  { key: 'goal', description: 'what the user wants to achieve', phase: 'intro' },
+  { key: 'durationOrFrequency', description: 'how long this has been going on or how often it happens', phase: 'intro' },
+  { key: 'age', description: "the user's age", phase: 'intro' },
+  { key: 'gender', description: "the user's gender", phase: 'intro' },
+  { key: 'weight', description: "the user's weight — okay to defer if the user doesn't want to share it", phase: 'intro' },
+
+  // impact — what the problem took from the person
+  { key: 'severityOrImpact', description: 'how much this affects daily life', phase: 'impact' },
+  { key: 'activitiesGivenUp', description: 'activities or habits the user gave up because of the problem', phase: 'impact' },
+  { key: 'impactOnRelationshipsAndConfidence', description: 'how the problem affected relationships, confidence, or independence', phase: 'impact' },
+  { key: 'roleOfProblemNow', description: 'what role the problem plays in the user’s life right now', phase: 'impact' },
+
+  // history — emotional causes and past attempts
+  { key: 'triedSoFar', description: 'what the user has already tried', phase: 'history' },
+  { key: 'whyPastAttemptsFailed', description: 'why past attempts to fix this didn’t work', phase: 'history' },
+  { key: 'preSlipTriggers', description: 'what tends to happen right before the user slips or gives up', phase: 'history' },
+  { key: 'shamefulAdviceReactions', description: 'advice or comments that made the user feel shame, guilt, or resistance', phase: 'history' },
+  { key: 'fearsAboutTryingAgain', description: 'what the user is afraid of if they try to change again', phase: 'history' },
+
+  // support — how to be safe and helpful, not judgmental
+  { key: 'preferredSupportStyle', description: 'how the user prefers to receive support', phase: 'support' },
+  { key: 'toneReadAsCaring', description: 'what tone or phrasing the user reads as caring', phase: 'support' },
+  { key: 'toneReadAsJudgmental', description: 'what tone or phrasing the user reads as judgmental or patronizing', phase: 'support' },
+  { key: 'directnessPreference', description: 'how bluntly the user wants to be told things', phase: 'support' },
+  { key: 'explanationVsActionPreference', description: 'whether the user wants explanations or just short actions', phase: 'support' },
+  { key: 'topicsToAvoidProactive', description: 'topics that must not come up in proactive (unprompted) messages', phase: 'support' },
+
+  // readiness — consent and pacing for what comes next
+  { key: 'readyToTryNow', description: 'what the user is willing to try right now', phase: 'readiness' },
+  { key: 'notReadyYet', description: 'what the user is explicitly not ready to do yet', phase: 'readiness' },
+  { key: 'whenNilaCanSuggestActions', description: 'when it’s okay for Nila to proactively suggest actions', phase: 'readiness' },
+  { key: 'canRevisitSensitiveTopicLater', description: 'whether a sensitive topic can be brought up again later', phase: 'readiness' },
+  { key: 'wantsProactiveMessages', description: 'whether the user wants proactive check-ins or only replies on request', phase: 'readiness' },
 ] as const;
-// Черновой список полей для v1 (Sprint 1, тонкий срез) — состав и формулировки
-// подлежат правке продуктом в Sprint 2 (Profile Synthesizer), см. docs/sprint-plan.md.
+// Черновой список полей (Sprint 1 → расширен по интервью-целям продукта, см.
+// docs/sprint-plan.md) — состав и формулировки подлежат дальнейшей правке.
 
 export type ProfileFieldKey = (typeof PROFILE_FIELD_CATALOG)[number]['key'];
 export type FieldStatus = 'known' | 'missing' | 'deferred';
+
+// Порядок = порядок прохождения; 'synthesis' — терминальная фаза без
+// собственных полей, там строится Future You brief поверх готового профиля.
+export const INTERVIEW_PHASE_ORDER = ['intro', 'impact', 'history', 'support', 'readiness', 'synthesis'] as const;
+export type InterviewPhase = (typeof INTERVIEW_PHASE_ORDER)[number];
+
+const DEMOGRAPHIC_FIELD_KEYS: readonly ProfileFieldKey[] = ['age', 'gender', 'weight'];
 
 export interface ProfileField {
   readonly key: ProfileFieldKey;
@@ -30,6 +70,7 @@ export interface InterviewProfile {
   readonly userId: string;
   readonly fields: ProfileField[];
   readonly openThreads: OpenThread[];
+  readonly currentPhase: InterviewPhase;
 }
 
 export function createEmptyProfile(userId: string): InterviewProfile {
@@ -37,11 +78,56 @@ export function createEmptyProfile(userId: string): InterviewProfile {
     userId,
     fields: PROFILE_FIELD_CATALOG.map(({ key }) => ({ key, status: 'missing' as const })),
     openThreads: [],
+    currentPhase: INTERVIEW_PHASE_ORDER[0],
   };
 }
 
+/**
+ * SPEC: missingFieldsInPhase
+ * Назначение: узнать, какие поля текущей фазы ещё не заполнены (known/deferred).
+ * Входы/Выход: профиль + фаза → ключи полей этой фазы со статусом missing
+ * Разрешённые side effects: нет (чистая функция)
+ */
+export function missingFieldsInPhase(profile: InterviewProfile, phase: InterviewPhase): ProfileFieldKey[] {
+  const phaseKeys = PROFILE_FIELD_CATALOG.filter((field) => field.phase === phase).map((field) => field.key);
+  const statusByKey = new Map(profile.fields.map((field) => [field.key, field.status]));
+  return phaseKeys.filter((key) => (statusByKey.get(key) ?? 'missing') === 'missing');
+}
+
+/**
+ * SPEC: onlyDemographicFieldsRemaining
+ * Назначение: сигнал для interview engine — пора спросить возраст/пол/вес
+ *   напрямую и коротко, а не socratic-вопросом, потому что это всё, что
+ *   осталось незаполненным в фазе.
+ * Входы/Выход: профиль + фаза → boolean
+ * Разрешённые side effects: нет (чистая функция)
+ */
+export function onlyDemographicFieldsRemaining(profile: InterviewProfile, phase: InterviewPhase): boolean {
+  const missing = missingFieldsInPhase(profile, phase);
+  return missing.length > 0 && missing.every((key) => DEMOGRAPHIC_FIELD_KEYS.includes(key));
+}
+
+/**
+ * SPEC: advancePhaseIfComplete
+ * Назначение: перейти к следующей фазе интервью, если текущая фаза больше не
+ *   содержит missing-полей (known или deferred — оба считаются закрытыми).
+ * Входы/Выход: профиль → InterviewPhase (следующая либо та же самая)
+ * Разрешённые side effects: нет (чистая функция)
+ * Инварианты: 'synthesis' — последняя фаза, дальше не продвигается.
+ */
+export function advancePhaseIfComplete(profile: InterviewProfile): InterviewPhase {
+  if (missingFieldsInPhase(profile, profile.currentPhase).length > 0) return profile.currentPhase;
+  const index = INTERVIEW_PHASE_ORDER.indexOf(profile.currentPhase);
+  return INTERVIEW_PHASE_ORDER[index + 1] ?? profile.currentPhase;
+}
+
+export interface ProfileFieldUpdate extends ProfileField {
+  /** Engine's own judgement that this value conflicts with the currently known one — see applyInterviewUpdate. */
+  readonly isContradiction?: boolean;
+}
+
 export interface ProfileUpdate {
-  readonly fields: ProfileField[];
+  readonly fields: ProfileFieldUpdate[];
   readonly openThreads: OpenThread[];
 }
 
@@ -53,15 +139,41 @@ export interface MergeResult {
 const CONTRADICTION_CONFIDENCE_THRESHOLD = 0.6;
 
 /**
+ * SPEC: isContradictingKnownField
+ * Назначение: решить, конфликтует ли входящее known-обновление с уже known-полем.
+ * Входы/Выход: существующее поле (может отсутствовать) + входящее обновление → boolean
+ * Разрешённые side effects: нет (чистая функция)
+ * Инварианты: см. applyInterviewUpdate — engine-флаг `isContradiction` первичен,
+ *   текстовое различие + порог confidence — страховочный запасной путь.
+ */
+function isContradictingKnownField(existing: ProfileField | undefined, incoming: ProfileFieldUpdate): boolean {
+  if (existing?.status !== 'known' || incoming.status !== 'known') return false;
+  if (existing.value === undefined || incoming.value === undefined) return false;
+  if (incoming.isContradiction === true) return true;
+  return incoming.value !== existing.value && (incoming.confidence ?? 1) >= CONTRADICTION_CONFIDENCE_THRESHOLD;
+}
+
+/**
  * SPEC: applyInterviewUpdate
  * Назначение: смёржить обновление от interview engine в текущий профиль (correction path).
  * Входы/Выход: текущий InterviewProfile + ProfileUpdate → MergeResult
  * Разрешённые side effects: нет (чистая функция)
- * Инварианты: если для уже known-поля приходит другое known-значение с
- *   confidence >= порога — поле НЕ перезаписывается молча, а возвращается в
- *   contradictions; вызывающий код обязан спросить пользователя перед merge.
+ * Инварианты: если для уже known-поля приходит другое known-значение — поле НЕ
+ *   перезаписывается молча, а возвращается в contradictions; вызывающий код
+ *   обязан спросить пользователя перед merge. Конфликт признаётся либо когда
+ *   engine сам явно пометил его (`isContradiction: true` — основной сигнал,
+ *   engine видит текущее значение поля в контексте и может сравнить по
+ *   смыслу, а не по тексту), либо — как страховка на случай, если engine не
+ *   проставил флаг — по старому эвристическому правилу: текстовое различие
+ *   значений при confidence >= порога. Полагаться только на текстовое
+ *   различие ненадёжно: два независимых LLM-парафраза одного и того же или
+ *   двух разных по смыслу ответов легко совпадают или расходятся текстуально
+ *   без связи с тем, противоречат ли они друг другу по факту.
  *   openThreads из update заменяют текущие целиком — engine каждый раз
  *   пересчитывает список заново (по всему профилю + последним ходам), это не delta.
+ *   currentPhase продвигается на следующую фазу (advancePhaseIfComplete), если
+ *   в текущей фазе не осталось missing-полей — известные contradictions это
+ *   не блокируют, поле остаётся known со старым значением до ответа пользователя.
  * Запрещено: перезаписывать known-поле без явного подтверждения пользователя.
  */
 export function applyInterviewUpdate(current: InterviewProfile, update: ProfileUpdate): MergeResult {
@@ -70,23 +182,22 @@ export function applyInterviewUpdate(current: InterviewProfile, update: ProfileU
 
   for (const incoming of update.fields) {
     const existing = fieldsByKey.get(incoming.key);
-    const isConflicting =
-      existing?.status === 'known' &&
-      incoming.status === 'known' &&
-      existing.value !== undefined &&
-      incoming.value !== undefined &&
-      incoming.value !== existing.value &&
-      (incoming.confidence ?? 1) >= CONTRADICTION_CONFIDENCE_THRESHOLD;
-
-    if (isConflicting) {
+    if (isContradictingKnownField(existing, incoming)) {
       contradictions.push(incoming);
       continue;
     }
     fieldsByKey.set(incoming.key, incoming);
   }
 
+  const merged: InterviewProfile = {
+    userId: current.userId,
+    fields: [...fieldsByKey.values()],
+    openThreads: update.openThreads,
+    currentPhase: current.currentPhase,
+  };
+
   return {
-    profile: { userId: current.userId, fields: [...fieldsByKey.values()], openThreads: update.openThreads },
+    profile: { ...merged, currentPhase: advancePhaseIfComplete(merged) },
     contradictions,
   };
 }

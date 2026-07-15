@@ -6,6 +6,7 @@ import type { ToneAnalysisPort } from '../application/ports/toneAnalysisPort.js'
 import type { TurnRepository } from '../application/ports/turnRepository.js';
 import type { InterviewEnginePort } from '../application/ports/interviewEnginePort.js';
 import type { InterviewProfileRepository } from '../application/ports/interviewProfileRepository.js';
+import type { CheckpointReflectionPort } from '../application/ports/checkpointReflectionPort.js';
 import type { InterviewProfile } from '../domain/interviewProfile.js';
 import { startInterviewSession } from '../domain/interviewSession.js';
 import { buildGreeting } from '../application/useCases/greetNewUser.js';
@@ -19,13 +20,14 @@ export interface TelegramHandlerDependencies {
   turnRepository: TurnRepository;
   interviewEngine: InterviewEnginePort;
   interviewProfileRepository: InterviewProfileRepository;
+  checkpointReflection: CheckpointReflectionPort;
 }
 
 // Только ключи и статусы (known/missing/deferred) — без values и evidence-quote,
 // чтобы отладочная команда не выводила сырой текст пользователя (CLAUDE.md §5).
 function formatCompletenessSummary(profile: InterviewProfile): string {
   const lines = profile.fields.map((field) => `${field.key}: ${field.status}`);
-  return ['Profile (field statuses):', ...lines].join('\n');
+  return [`Profile (phase: ${profile.currentPhase}):`, ...lines].join('\n');
 }
 
 export function registerTelegramHandlers(bot: Bot, deps: TelegramHandlerDependencies): void {
