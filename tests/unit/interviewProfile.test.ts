@@ -40,6 +40,18 @@ test('still flags a contradiction on the old text-diff heuristic when the engine
   assert.equal(contradictions.length, 1);
 });
 
+test('an explicit isContradiction: false overrides the text-diff heuristic, so a resolved contradiction can actually be applied', () => {
+  const current = profileWithKnownGoal('lose weight');
+
+  const { contradictions, profile } = applyInterviewUpdate(current, {
+    fields: [{ key: 'goal', status: 'known', value: 'gain muscle', confidence: 0.9, isContradiction: false }],
+    openThreads: [],
+  });
+
+  assert.equal(contradictions.length, 0, 'engine explicitly said this is not a contradiction — must not fall back to the heuristic');
+  assert.equal(profile.fields.find((field) => field.key === 'goal')?.value, 'gain muscle');
+});
+
 test('does not flag a contradiction for a low-confidence, unflagged, differently worded update', () => {
   const current = profileWithKnownGoal('lose weight');
 

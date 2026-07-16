@@ -108,6 +108,18 @@ export function onlyDemographicFieldsRemaining(profile: InterviewProfile, phase:
 }
 
 /**
+ * SPEC: isInterviewComplete
+ * Назначение: единая точка знания о том, что 'synthesis' — терминальная фаза
+ *   (см. INTERVIEW_PHASE_ORDER) — вызывающий код не должен сравнивать
+ *   currentPhase со строковым литералом напрямую.
+ * Входы/Выход: профиль (может отсутствовать) → boolean
+ * Разрешённые side effects: нет (чистая функция)
+ */
+export function isInterviewComplete(profile: InterviewProfile | null): boolean {
+  return profile?.currentPhase === INTERVIEW_PHASE_ORDER[INTERVIEW_PHASE_ORDER.length - 1];
+}
+
+/**
  * SPEC: advancePhaseIfComplete
  * Назначение: перейти к следующей фазе интервью, если текущая фаза больше не
  *   содержит missing-полей (known или deferred — оба считаются закрытыми).
@@ -143,13 +155,19 @@ const CONTRADICTION_CONFIDENCE_THRESHOLD = 0.6;
  * Назначение: решить, конфликтует ли входящее known-обновление с уже known-полем.
  * Входы/Выход: существующее поле (может отсутствовать) + входящее обновление → boolean
  * Разрешённые side effects: нет (чистая функция)
- * Инварианты: см. applyInterviewUpdate — engine-флаг `isContradiction` первичен,
- *   текстовое различие + порог confidence — страховочный запасной путь.
+ * Инварианты: см. applyInterviewUpdate — engine-флаг `isContradiction`
+ *   первичен и в обе стороны: явный `true` форсирует contradiction, явный
+ *   `false` его подавляет — даже если текст всё ещё отличается от старого
+ *   значения. Без этого пользователь, разрешающий уточняющий вопрос
+ *   ("да, именно X"), не может закрыть contradiction: та же самая
+ *   эвристика (различный текст + высокая confidence) снова сработает на
+ *   его подтверждающем ответе. Эвристика — запасной путь только когда
+ *   engine вообще не высказался (`isContradiction === undefined`).
  */
 function isContradictingKnownField(existing: ProfileField | undefined, incoming: ProfileFieldUpdate): boolean {
   if (existing?.status !== 'known' || incoming.status !== 'known') return false;
   if (existing.value === undefined || incoming.value === undefined) return false;
-  if (incoming.isContradiction === true) return true;
+  if (incoming.isContradiction !== undefined) return incoming.isContradiction;
   return incoming.value !== existing.value && (incoming.confidence ?? 1) >= CONTRADICTION_CONFIDENCE_THRESHOLD;
 }
 
@@ -215,4 +233,22 @@ export function applyInterviewUpdate(current: InterviewProfile, update: ProfileU
     profile: { ...merged, currentPhase: advancePhaseIfComplete(merged) },
     contradictions,
   };
+}
+
+function describeFieldForContradiction(key: ProfileFieldKey): string {
+  return PROFILE_FIELD_CATALOG.find((field) => field.key === key)?.description ?? key;
+}
+
+/**
+ * SPEC: describeContradiction
+ * Назначение: сформулировать уточняющий вопрос пользователю при конфликте
+ *   нового ответа со старым known-значением поля (см. advanceInterview,
+ *   вызывается после applyInterviewUpdate).
+ * Входы/Выход: профиль до merge + конфликтующее поле (из MergeResult.contradictions) → текст вопроса
+ * Разрешённые side effects: нет (чистая функция)
+ */
+export function describeContradiction(profileBeforeMerge: InterviewProfile, conflict: ProfileField): string {
+  const oldValue = profileBeforeMerge.fields.find((field) => field.key === conflict.key)?.value ?? '';
+  const newValue = conflict.value ?? '';
+  return `Quick check — earlier you said "${oldValue}" about ${describeFieldForContradiction(conflict.key)}, but now it sounds like "${newValue}". Which one is accurate right now?`;
 }

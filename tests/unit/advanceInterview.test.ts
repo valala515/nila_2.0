@@ -138,3 +138,51 @@ test('does not call checkpoint reflection on a phase transition other than impac
   assert.equal(result.profile.currentPhase, 'impact');
   assert.equal(result.replyText, 'ENGINE_NEXT_QUESTION');
 });
+
+test('offers no quick replies under an ordinary interview question (buttons only on the felt-heard survey)', async () => {
+  const deps = buildDeps({
+    profile: impactProfileMissingOneField(),
+    engineResult: {
+      fieldUpdates: [],
+      openThreads: [],
+      nextQuestion: 'ENGINE_NEXT_QUESTION',
+      flaggedForReview: false,
+    },
+    reflectCalls: [],
+  });
+
+  const result = await advanceInterview('user-1', 'tell me more', 'text', deps);
+
+  assert.equal(result.quickReplies, 'none');
+});
+
+test('offers experience quick replies and asks how the conversation felt on entering synthesis', async () => {
+  const profile: InterviewProfile = {
+    userId: 'user-1',
+    fields: [
+      { key: 'readyToTryNow', status: 'known', value: 'short walks', confidence: 0.9 },
+      { key: 'notReadyYet', status: 'known', value: 'running', confidence: 0.9 },
+      { key: 'whenNilaCanSuggestActions', status: 'known', value: 'mornings', confidence: 0.9 },
+      { key: 'canRevisitSensitiveTopicLater', status: 'known', value: 'yes', confidence: 0.9 },
+      { key: 'wantsProactiveMessages', status: 'missing' },
+    ],
+    openThreads: [],
+    currentPhase: 'readiness',
+  };
+  const deps = buildDeps({
+    profile,
+    engineResult: {
+      fieldUpdates: [{ key: 'wantsProactiveMessages', status: 'known', value: 'yes please', confidence: 0.9 }],
+      openThreads: [],
+      nextQuestion: 'ENGINE_NEXT_QUESTION',
+      flaggedForReview: false,
+    },
+    reflectCalls: [],
+  });
+
+  const result = await advanceInterview('user-1', 'yes, check in with me', 'text', deps);
+
+  assert.equal(result.profile.currentPhase, 'synthesis');
+  assert.equal(result.quickReplies, 'experience');
+  assert.notEqual(result.replyText, 'ENGINE_NEXT_QUESTION');
+});

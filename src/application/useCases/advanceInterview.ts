@@ -3,12 +3,13 @@ import { requestInterviewFeedback } from './collectInterviewFeedback.js';
 import {
   createEmptyProfile,
   applyInterviewUpdate,
+  describeContradiction,
   fieldsTransitionedToKnown,
-  PROFILE_FIELD_CATALOG,
+  isInterviewComplete,
   type InterviewProfile,
   type ProfileField,
-  type ProfileFieldKey,
 } from '../../domain/interviewProfile.js';
+import type { InterviewReplyOutcome, QuickRepliesKind } from '../../domain/interviewReply.js';
 import type { TurnChannel, TurnRecord } from '../../domain/turnRecord.js';
 import type { InterviewEnginePort, InterviewTurnResult } from '../ports/interviewEnginePort.js';
 import type { InterviewProfileRepository } from '../ports/interviewProfileRepository.js';
@@ -28,17 +29,13 @@ export interface AdvanceInterviewDeps extends ProcessUserUtteranceDeps {
   session: SessionPort;
 }
 
-export interface AdvanceInterviewResult {
-  replyText: string;
-  profile: InterviewProfile;
+export interface AdvanceInterviewResult extends InterviewReplyOutcome {
+  readonly profile: InterviewProfile;
 }
 
-function describeField(key: ProfileFieldKey): string {
-  return PROFILE_FIELD_CATALOG.find((field) => field.key === key)?.description ?? key;
-}
-
-function buildContradictionQuestion(oldValue: string, newValue: string, fieldKey: ProfileFieldKey): string {
-  return `Quick check — earlier you said "${oldValue}" about ${describeField(fieldKey)}, but now it sounds like "${newValue}". Which one is accurate right now?`;
+interface ResolvedReply {
+  readonly text: string;
+  readonly quickReplies: QuickRepliesKind;
 }
 
 interface TurnOutcome {
@@ -89,7 +86,7 @@ async function recordTurnAnalytics(outcome: TurnOutcome, analyticsEvent: Analyti
  * Разрешённые side effects: SessionPort.recordUserTurn
  */
 async function recordSessionProgress(outcome: TurnOutcome, session: SessionPort): Promise<void> {
-  const enteredSynthesis = outcome.before.currentPhase !== 'synthesis' && outcome.after.currentPhase === 'synthesis';
+  const enteredSynthesis = !isInterviewComplete(outcome.before) && isInterviewComplete(outcome.after);
   await session.recordUserTurn(outcome.sessionId, {
     answerChars: outcome.turn.text.length,
     phaseAfter: outcome.after.currentPhase,
@@ -102,28 +99,33 @@ async function recordSessionProgress(outcome: TurnOutcome, session: SessionPort)
  * Назначение: выбрать текст ответа пользователю по итогам хода — уточнение
  *   при contradiction, checkpoint-отражение на impact→history, felt-heard
  *   опрос на первом входе в synthesis, иначе обычный nextQuestion от engine.
- *   Вынесено из advanceInterview ради cyclomatic complexity (CLAUDE.md §3).
- * Входы/Выход: TurnOutcome + AdvanceInterviewDeps → текст ответа
+ *   Квикреплаи (👍/👎) показываются только под felt-heard опросом — решение
+ *   пользователя 16 июля после живого теста в Telegram: кнопки под каждым
+ *   вопросом интервью оказались избыточны (см. docs/sprint-plan.md).
+ * Входы/Выход: TurnOutcome + AdvanceInterviewDeps → { text, quickReplies }
  * Разрешённые side effects: CheckpointReflectionPort.reflect, AnalyticsEventPort.record
  *   ('interview_completed'), PendingFeedbackRepository.setPending (через requestInterviewFeedback)
  */
-async function resolveReply(outcome: TurnOutcome, deps: AdvanceInterviewDeps): Promise<string> {
+async function resolveReply(outcome: TurnOutcome, deps: AdvanceInterviewDeps): Promise<ResolvedReply> {
   const conflict = outcome.contradictions[0];
   if (conflict) {
-    const oldValue = outcome.before.fields.find((field) => field.key === conflict.key)?.value ?? '';
-    return buildContradictionQuestion(oldValue, conflict.value ?? '', conflict.key);
+    return { text: describeContradiction(outcome.before, conflict), quickReplies: 'none' };
   }
 
   const enteredHistoryPhase = outcome.before.currentPhase === 'impact' && outcome.after.currentPhase === 'history';
-  if (enteredHistoryPhase) return deps.checkpointReflection.reflect(outcome.after, outcome.recentTurns);
-
-  const enteredSynthesisPhase = outcome.before.currentPhase !== 'synthesis' && outcome.after.currentPhase === 'synthesis';
-  if (enteredSynthesisPhase) {
-    await deps.analyticsEvent.record('interview_completed', outcome.userId, { totalTurns: outcome.turnNumber });
-    return requestInterviewFeedback(outcome.userId, 'felt_heard', deps);
+  if (enteredHistoryPhase) {
+    const text = await deps.checkpointReflection.reflect(outcome.after, outcome.recentTurns);
+    return { text, quickReplies: 'none' };
   }
 
-  return outcome.result.nextQuestion;
+  const enteredSynthesisPhase = !isInterviewComplete(outcome.before) && isInterviewComplete(outcome.after);
+  if (enteredSynthesisPhase) {
+    await deps.analyticsEvent.record('interview_completed', outcome.userId, { totalTurns: outcome.turnNumber });
+    const text = await requestInterviewFeedback(outcome.userId, 'felt_heard', deps);
+    return { text, quickReplies: 'experience' };
+  }
+
+  return { text: outcome.result.nextQuestion, quickReplies: 'none' };
 }
 
 /**
@@ -157,20 +159,13 @@ export async function advanceInterview(
   deps: AdvanceInterviewDeps,
 ): Promise<AdvanceInterviewResult> {
   const sessionId = await deps.session.getOrOpenCurrentSession(userId);
-  const turn = await processUserUtterance(userId, text, channel, sessionId, deps);
-
   const existingProfile = await deps.interviewProfileRepository.load(userId);
   const profile = existingProfile ?? createEmptyProfile(userId);
 
+  const turn = await processUserUtterance(userId, text, channel, sessionId, deps);
   // role filter: user only — turns хранит только реплики пользователя (см. TurnRepository).
   const recentTurns = await deps.turnRepository.listRecent(sessionId, RECENT_TURNS_LIMIT);
-
-  const result = await deps.interviewEngine.advance({
-    userAnswer: text,
-    profile,
-    recentTurns,
-    tone: turn.tone,
-  });
+  const result = await deps.interviewEngine.advance({ userAnswer: text, profile, recentTurns, tone: turn.tone });
 
   if (result.flaggedForReview) {
     console.warn(`Interview turn flagged for review, turnId=${turn.id}`);
@@ -199,7 +194,7 @@ export async function advanceInterview(
 
   await recordTurnAnalytics(outcome, deps.analyticsEvent);
   await recordSessionProgress(outcome, deps.session);
-  const replyText = await resolveReply(outcome, deps);
-  await deps.session.recordBotMessage(sessionId, userId, replyText);
-  return { replyText, profile: mergedProfile };
+  const reply = await resolveReply(outcome, deps);
+  await deps.session.recordBotMessage(sessionId, userId, reply.text);
+  return { replyText: reply.text, profile: mergedProfile, quickReplies: reply.quickReplies };
 }
