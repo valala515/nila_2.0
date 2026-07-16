@@ -1,3 +1,12 @@
+# [1.2.0](https://github.com/valala515/nila_2.0/compare/v1.1.0...v1.2.0) (2026-07-16)
+
+
+### Features
+
+* **courses:** каталог курсов New Mind Start и рекомендательный движок ([70c3e27](https://github.com/valala515/nila_2.0/commit/70c3e2790352c5b63324b47dd4316137099765db))
+* **interview:** рейтинг опыта вместо рейтинга вопросов, убран нерабочий edit-flow ([3e2fdb3](https://github.com/valala515/nila_2.0/commit/3e2fdb3ff69fb76fdc6a8e57751f17751619eaa1))
+* **voice:** STT golden-benchmark на Critical Fact Recall и retrospective ADR по вендору ([035463b](https://github.com/valala515/nila_2.0/commit/035463bdb759e394cc777a12e1676aebd59ed49c))
+
 # [1.1.0](https://github.com/valala515/nila_2.0/compare/v1.0.0...v1.1.0) (2026-07-15)
 
 
