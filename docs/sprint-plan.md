@@ -18,7 +18,7 @@
 
 | W | Даты | Релиз | Статус |
 |---|---|---|---|
-| 1 | 14–17 июл | Telegram + adaptive voice interview | 🔶 в работе — инфраструктура и движок интервью опережают план, correction path требует доработки, voice benchmark отстаёт |
+| 1 | 14–17 июл | Telegram + adaptive voice interview | 🔶 в работе — инфраструктура, движок интервью и voice benchmark опережают план, E2E dogfood ещё не начат |
 | 2 | 20–24 июл | Interview quality + hidden completeness | ⬜ не начат |
 | 3 | 27–31 июл | The You Who Made It (selfie → avatar reveal) | ⬜ не начат |
 | 4 | 3–7 авг | 48-hour best-friend loop + NMS | ⬜ не начат |
@@ -44,15 +44,14 @@
 *Что делать:* решение по деплою (публичный домен/reverse proxy или Cloud Run/Tasks) нужно принять не позже
 начала Week 6, не в последний день.
 
-**2. STT выбран без запланированного бенчмарка.** V0.2 требует benchmark OpenAI gpt-4o-transcribe vs
-Deepgram Nova-3 Medical на 20–30 gold-клипах, критерий — Critical Fact Recall (отрицания, дозы), а не WER.
-По факту: пользователь подтвердил готовый OpenAI-ключ, адаптер выбран и подключён без бенчмарка.
-*Почему это важно:* Week 2 Definition of Done требует «no negation/dose errors in golden set» — это ровно то,
-что бенчмарк должен был проверить заранее.
-*Что делать:* провести урезанный retrospective-бенчмарк (тот же голден-сет, только OpenAI, без сравнения с
-Deepgram) в начале Week 2, до того как на этот адаптер начнёт полагаться State Updater. Оформить как
-`docs/adr/0002-stt-vendor-openai.md` — решение приняли по чужому критерию (готовность ключа), а не по
-Critical Fact Recall, ADR должен зафиксировать, при каком провале eval это пересматривается.
+**2. STT выбран без запланированного бенчмарка — закрыто 16 июля.** V0.2 требовал benchmark OpenAI
+gpt-4o-transcribe vs Deepgram Nova-3 Medical на 20–30 gold-клипах, критерий — Critical Fact Recall
+(отрицания, дозы), а не WER. По факту: 15 июля пользователь подтвердил готовый OpenAI-ключ, адаптер выбран
+без сравнения; сравнение с Deepgram отдельно снято с повестки в тот же день (см. «Открытые решения»).
+Retrospective Critical Fact Recall на 24 golden-клипах проведён 16 июля — 95.8%/100% в двух чистых прогонах,
+negation/dose 100% в каждом. Задокументировано в `docs/adr/0003-stt-vendor-openai.md` (не `0002` — этот номер
+уже занят `conversation-history-and-caching-strategy`), включая два реальных бага, найденных по пути
+(hardcoded `.ogg`-расширение в адаптере, `\b`-граница в матчере фактов).
 
 **3. Место репозитория в архитектуре не решено.** V0.2 предполагает «один backend Neoly/Nila AI, одна БД,
 отдельный wellness-модуль» — то есть этот бот должен встраиваться в существующий backend. По факту
@@ -109,7 +108,7 @@ Thu 16 Jul — в основном реализован в коммите Tue 14
 важен весь скоуп к Fri dogfood, не порядок. Voice benchmark стоит вернуть в фокус до Fri, параллельно с
 доработкой correction path.
 
-**10. Correction path: код есть, эффект — нет (ручной тест 14 Jul).** `applyInterviewUpdate` и
+**10. Correction path: код есть, эффект — нет (ручной тест 14 Jul) — закрыто.** `applyInterviewUpdate` и
 `buildContradictionQuestion` реализованы и должны превращать конфликтующее known-поле в уточняющий вопрос
 вместо молчаливой перезаписи. На ручном тесте пользователь намеренно дал два противоречащих друг другу
 утверждения — уточняющий вопрос не появился.
@@ -121,10 +120,11 @@ Thu 16 Jul — в основном реализован в коммите Tue 14
 "explicit contradiction (see below)", но раздела "below" в тексте промпта нет — модели неоткуда взять
 инструкцию, как вести себя на этапе extraction при обнаруженном противоречии; весь contradiction-handling
 сейчас держится только на доменной функции, а не на инструкции модели.
-*Что делать:* приоритетная задача на 15 июля, важнее черновой доработки profile-каталога: (1) добавить в
-промпт эксплицитный раздел про contradiction; (2) рассмотреть явный флаг от модели (`isContradiction:
-boolean`) вместо вывода через string diff; (3) добавить unit-тест на `applyInterviewUpdate` с реальными
-противоречащими формулировками, а не идентичными строками.
+*Сделано:* все три пункта из плана 15 июля реализованы: (1) `prompts/interviewEngine.v4.md` содержит
+эксплицитный раздел про contradiction ("judge by meaning, not by wording"); (2) модель сама проставляет
+`isContradiction: true/false`, string-diff остался только страховочным fallback; (3)
+`tests/unit/interviewProfile.test.ts` покрывает оба пути (engine-флаг и текстовый fallback) реальными
+противоречащими формулировками, не идентичными строками.
 
 ---
 
@@ -136,7 +136,7 @@ boolean`) вместо вывода через string diff; (3) добавить
 | День | Фокус | План v0.2 | Статус |
 |---|---|---|---|
 | Tue 14 Jul | Foundation | CLAUDE.md, ADR, bot/webhook, allowlist, migrations, event names, smoke test | 🔶 |
-| Wed 15 Jul | Voice benchmark | 20–30 gold clips, OpenAI vs Deepgram, keyterms, latency/cost logging, выбрать STT | 🔶 |
+| Wed 15 Jul | Voice benchmark | 20–30 gold clips, OpenAI vs Deepgram, keyterms, latency/cost logging, выбрать STT | ✅ (16 Jul, синтетические клипы вместо записей людей) |
 | Thu 16 Jul | Interview engine | State Update schema, completeness map, open_threads, next-question prompt, correction path | 🔶 (сделано на 2 дня раньше, во Tue) |
 | Fri 17 Jul | E2E dogfood | 3 внутренних пользователя, 5–7 turns, profile draft, sprint demo | ⬜ |
 
@@ -155,18 +155,23 @@ boolean`) вместо вывода через string diff; (3) добавить
 - ✅ (доп.) GlitchTip error tracking подключён (см. корректировку №7)
 - ✅ (доп.) `docs/domain-glossary.md` заведён
 
-### Wed 15 Jul — Voice benchmark
+### Wed 15 Jul → 16 Jul — Voice benchmark
 
-- ⬜ 20–30 gold clips — не собирались; нужны не для выбора вендора (см. ниже), а чтобы проверить Critical
-  Fact Recall (отрицания, дозы) именно у уже выбранного OpenAI-адаптера — Definition of Done Week 2 требует
-  "no negation/dose errors in golden set"
+- ✅ 24 golden-клипа (`tests/contract/fixtures/sttGoldenSet.json`) — синтетические (ElevenLabs TTS,
+  независимо от тестируемого OpenAI STT), не 20–30 записей людей — компромисс ради скорости, см.
+  `docs/adr/0003-stt-vendor-openai.md`
 - ➖ **Решено 15 Jul: вендор — OpenAI, сравнения с Deepgram не будет.** Ключ уже в `.env`
-  (`OPENAI_API_KEY`), адаптер работает. Сравнение снято с повестки, но retrospective-бенчмарк Critical Fact
-  Recall на golden-клипах (пункт выше) всё ещё нужен — это проверка качества, не выбор вендора
-- ⬜ Glossary/keyterms в STT-запросе — не реализовано
-- ⬜ Latency/cost logging по STT-вызовам — не реализовано
-- 🔶 STT-адаптер выбран и работает (`gpt-4o-transcribe`), но решение принято по готовности ключа, а не по
-  Critical Fact Recall (см. корректировку №2)
+  (`OPENAI_API_KEY`), адаптер работает.
+- ✅ Retrospective Critical Fact Recall на golden-наборе — 95.8%/100% в двух чистых прогонах,
+  negation/dose 100% в каждом (`pnpm run stt:benchmark`, `docs/adr/0003-stt-vendor-openai.md`). По пути
+  найдены и исправлены два реальных бага: hardcoded `.ogg`-расширение в `speechToText.ts` (валило non-ogg
+  аудио) и `\b`-граница в матчере (не матчила фразы, оканчивающиеся не-словесным символом, `"40%"`)
+- ✅ Glossary/keyterms в STT-запросе — `src/domain/sttGlossary.ts` + `prompt`/`language: 'en'` в
+  `speechToText.ts` (черновой список терминов, расширяется по мере dogfood)
+- ✅ Latency/cost logging по STT-вызовам — уже было реализовано на момент написания этого пункта
+  (`stt_call_completed` → `getCostPerCompletedSession`), просто не отражено в предыдущей версии этого файла
+- 🔶 STT-адаптер выбран и работает (`gpt-4o-transcribe`), решение по-прежнему принято по готовности ключа, но
+  теперь дополнительно подтверждено retrospective-бенчмарком (см. корректировку №2)
 
 ### Thu 16 Jul — Interview engine (сделано во Tue, на 2 дня раньше)
 
@@ -206,11 +211,12 @@ userId/каналом/тоном/временем.
 - ✅ Каждый следующий вопрос явно следует открытой нити предыдущего ответа
 - ✅ Обязательные поля имеют статус known/missing/deferred (сам список полей ещё черновой, см. «Открытые
   решения»)
-- 🔶 Нет ошибок отрицания/доз на тестовом наборе; low-confidence не становится confirmed — механизм
-  contradiction есть, но ненадёжен (см. корректировку №10), golden-набора для проверки нет
+- ✅ Нет ошибок отрицания/доз на golden-наборе (24 клипа, 95.8%/100% recall в двух прогонах, negation/dose
+  100% в каждом — `docs/adr/0003-stt-vendor-openai.md`); low-confidence contradiction-механизм отдельно
+  описан в корректировке №10
 - ⬜ После 5–7 turns виден structured draft
 - 🔶 Raw text не идёт в console/observability (SPEC в `processUserUtterance.ts` явно это запрещает) ✅;
-  cost/latency events по STT и tone-анализу — не пишутся ⬜
+  cost/latency events по STT пишутся (`stt_call_completed`) ✅, по tone-анализу — нет ⬜
 
 ---
 
@@ -359,9 +365,8 @@ test с 5–8 женщинами 50+.
 
 - ⚠️ **Деплой:** long polling до какой недели? Публичный HTTPS-эндпоинт понадобится не позже Week 6 (WHOOP
   webhooks) — раньше, если Telegram webhook тоже нужен раньше.
-- ✅ **STT-вендор:** решено 15 Jul — OpenAI, без сравнения с Deepgram. Открытым остаётся только когда делать
-  retrospective-бенчмарк Critical Fact Recall (golden-клипы) — в начале Week 2, как и планировалось, или
-  раньше.
+- ✅ **STT-вендор:** решено 15 Jul — OpenAI, без сравнения с Deepgram. Retrospective-бенчмарк Critical Fact
+  Recall проведён 16 Jul, раньше начала Week 2 — закрыто, см. `docs/adr/0003-stt-vendor-openai.md`.
 - ⚠️ **Место в архитектуре:** `nila_2.0` остаётся самостоятельным сервисом до конца MVP, или интегрируется в
   Neoly backend до Week 5?
 - ⚠️ **Allowlist:** добавить до второго внутреннего тестера — кто входит в список?

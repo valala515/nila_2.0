@@ -1,0 +1,30 @@
+[
+  { "id": "negation-1", "category": "negation", "text": "I don't binge eat anymore, but I still think about food a lot.", "criticalFacts": ["don't", "binge eat"] },
+  { "id": "negation-2", "category": "negation", "text": "I haven't told my doctor about this.", "criticalFacts": ["haven't", "doctor"] },
+  { "id": "negation-3", "category": "negation", "text": "No, that's not the real reason I stopped going to the gym.", "criticalFacts": ["not the real reason"] },
+  { "id": "negation-4", "category": "negation", "text": "I never tried therapy before this year.", "criticalFacts": ["never", "therapy"] },
+  { "id": "negation-5", "category": "negation", "text": "I'm not taking metformin anymore.", "criticalFacts": ["not taking", "metformin"] },
+  { "id": "negation-6", "category": "negation", "text": "It's not that I don't want help, I just don't trust it will work.", "criticalFacts": ["don't want help", "don't trust"] },
+
+  { "id": "dose-1", "category": "dose", "text": "I take 200 milligrams of sertraline every morning.", "criticalFacts": [["200 milligrams", "200mg", "two hundred milligrams"], "sertraline"] },
+  { "id": "dose-2", "category": "dose", "text": "I do intermittent fasting three times a week.", "criticalFacts": ["intermittent fasting", ["three times a week", "3 times a week"]] },
+  { "id": "dose-3", "category": "dose", "text": "I take ibuprofen twice a day when it gets bad.", "criticalFacts": ["ibuprofen", "twice a day"] },
+  { "id": "dose-4", "category": "dose", "text": "My recovery score dropped to 40 percent last week.", "criticalFacts": ["recovery score", ["40 percent", "40%"]] },
+  { "id": "dose-5", "category": "dose", "text": "I take melatonin at ten milligrams before bed.", "criticalFacts": ["melatonin", ["ten milligrams", "10 milligrams", "10mg"]] },
+  { "id": "dose-6", "category": "dose", "text": "I've been doing this for about five years now.", "criticalFacts": [["five years", "5 years"]] },
+
+  { "id": "number-1", "category": "number", "text": "I'm 52 years old and I've gained 15 pounds this year.", "criticalFacts": [["52 years old", "fifty-two years old"], ["15 pounds", "fifteen pounds"]] },
+  { "id": "number-2", "category": "number", "text": "I weigh around 180 pounds right now.", "criticalFacts": [["180 pounds", "one hundred eighty pounds"]] },
+  { "id": "number-3", "category": "number", "text": "It started when I was 34.", "criticalFacts": [["34", "thirty-four"]] },
+  { "id": "number-4", "category": "number", "text": "I check my HRV every single morning.", "criticalFacts": ["HRV"] },
+  { "id": "number-5", "category": "number", "text": "I lost about 8 pounds and then gained 12 back.", "criticalFacts": [["8 pounds", "eight pounds"], ["12", "twelve"]] },
+  { "id": "number-6", "category": "number", "text": "I've tried this maybe four or five times before.", "criticalFacts": [["four or five times", "4 or 5 times"]] },
+
+  { "id": "combined-1", "category": "combined", "text": "I stopped taking metformin two months ago and I don't regret it.", "criticalFacts": ["stopped taking", "metformin", ["two months", "2 months"], "don't regret"] },
+  { "id": "combined-2", "category": "combined", "text": "I'm not proud of it, but I skipped my appointment three times.", "criticalFacts": ["not proud", ["three times", "3 times"]] },
+  { "id": "combined-3", "category": "combined", "text": "I don't binge eat anymore, but last week it happened twice.", "criticalFacts": ["don't binge eat", "twice"] },
+
+  { "id": "control-1", "category": "control", "text": "My main concern right now is my energy levels in the afternoon.", "criticalFacts": ["energy levels"] },
+  { "id": "control-2", "category": "control", "text": "I want to feel more confident around my kids.", "criticalFacts": ["confident"] },
+  { "id": "control-3", "category": "control", "text": "I prefer short, direct advice rather than long explanations.", "criticalFacts": ["short", "direct"] }
+]
