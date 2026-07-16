@@ -1,0 +1,28 @@
+{
+  "listResponse": {
+    "data": [
+      {
+        "id": 1716,
+        "title": "Tai Chi for Beginners: Balance & Calm",
+        "slug": "tai-chi-for-beginners",
+        "author_info": "[{\"name\":\"Jane Doe\"}]",
+        "rating": 4.8,
+        "rating_count": 132,
+        "thumb_big": "https://newmindstart.com/thumbs/1716-big.jpg",
+        "thumb": "https://newmindstart.com/thumbs/1716.jpg",
+        "excerpt": "<p>A gentle introduction to Tai Chi for balance, calm, and mobility.</p>",
+        "sections": [
+          {
+            "lessons": [{ "title": "Lesson 1: Standing Posture" }, { "title": "Lesson 2: Weight Shifting" }]
+          }
+        ],
+        "lang": "en",
+        "created_at": "2026-03-01T00:00:00.000Z"
+      }
+    ],
+    "pagination": { "pagination_page_count": 1 }
+  },
+  "detailResponse": {
+    "description": "[{\"type\":\"include\",\"list\":[{\"icon\":\"video\",\"text\":\"12 lessons\"}]},{\"type\":\"for\",\"subtitle\":\"<b>Anyone seeking gentle daily movement</b>\"},{\"type\":\"text\",\"text\":\"Tai Chi builds balance and calm through slow, deliberate movement practiced daily.\"},{\"type\":\"list\",\"list\":[\"Improves balance and coordination\",\"Reduces stress through mindful movement\"]}]"
+  }
+}

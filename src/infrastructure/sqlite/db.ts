@@ -53,6 +53,24 @@ export function createDatabase(path: string): Database.Database {
       created_at_iso TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS bot_messages_session_id_idx ON bot_messages (session_id);
+    CREATE TABLE IF NOT EXISTS courses (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      author TEXT,
+      rating REAL,
+      rating_count INTEGER,
+      thumb_url TEXT,
+      excerpt TEXT NOT NULL,
+      body TEXT,
+      lesson_titles_json TEXT NOT NULL,
+      lessons_count INTEGER,
+      course_focus TEXT,
+      lang TEXT,
+      topics_json TEXT NOT NULL,
+      created_at TEXT,
+      synced_at_iso TEXT NOT NULL
+    );
   `);
   addColumnIfMissing(db, 'profiles', 'pending_feedback_kind', 'TEXT');
   addColumnIfMissing(db, 'turns', 'session_id', 'INTEGER');

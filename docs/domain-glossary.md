@@ -23,6 +23,10 @@
 | **History delete (hard)** | Необратимое удаление всех строк пользователя (`turns`/`profiles`/`events`/`sessions`/`bot_messages`) из SQL — для полной очистки тестового аккаунта, в отличие от soft reset ничего не остаётся | `application/useCases/manageUserHistory.ts` (`deleteUserHistory`), `infrastructure/sqlite/userResetRepository.ts` |
 | **Bot message** | Реплика бота, зафиксированная сразу после отправки пользователю (вопрос интервью, checkpoint-отражение, felt-heard опрос/благодарность, приветствие) — парный к `Turn` источник для транскрипта разговора | `infrastructure/sqlite/sessionRepository.ts` (`recordBotMessage`), таблица `bot_messages` |
 | **Transcript** | Полный обмен одной сессии — `turns` (роль user) и `bot_messages` (роль assistant), слитые по времени — то, что показывает drawer таблицы разговоров в дашборде | `application/ports/conversationsQueryPort.ts` (`getTranscript`) |
+| **Course** | Один курс из каталога New Mind Start (title/author/excerpt/body/lessons/topics) — синхронизируется локально, не запрашивается у NMS на каждый запрос | `domain/course.ts` |
+| **Course topic** | Один из 8 детерминированных тематических кластеров курса (nutrition_gut, sleep_rest, stress_anxiety, parenting_child, movement_mobility, pain_recovery, beauty_anti_aging, creativity_spirituality) — присваивается при синхронизации (index-time enrichment), не пересчитывается на каждый запрос | `domain/courseTopic.ts` (`classifyCourseTopics`) |
+| **Course catalog sync** | Получение полного каталога NMS через `CourseCatalogPort`, классификация тем и сохранение в SQLite (`pnpm run courses:sync`) | `application/useCases/syncCourseCatalog.ts` |
+| **Course recommendation** | Топ-N курсов каталога, отранжированных по текстовому запросу (keyword-скоринг + audience guard + topic boost) — движок готов, но пока не подключён ни к одному transport (проактивный советник — Sprint 4, `docs/sprint-plan.md`) | `domain/courseRecommendation.ts` (`rankCourses`), `application/useCases/recommendCourses.ts` |
 
 Соответствие со сводом (`docs/input/...`): «completeness map» свода = множество
 `ProfileField.status` по всем полям; «open threads» — как в своде, без изменений.
