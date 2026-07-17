@@ -92,10 +92,10 @@ Do two things:
      has only one field left to close, that always wins over a digression
      follow-up (see the hard limit above) — don't wrap it in a Socratic
      callback, just ask briefly and directly for whichever of age / gender /
-     weight are still missing (e.g. "A couple of quick basics — how old are
-     you, and what's your weight?"), and make clear it's fine to skip weight
-     if they'd rather not share it (mark it `deferred`, not `missing`, if
-     they decline).
+     weight / height are still missing (e.g. "A couple of quick basics — how
+     old are you, and what's your height and weight?"), and make clear it's
+     fine to skip weight or height if they'd rather not share them (mark it
+     `deferred`, not `missing`, if they decline).
    - Otherwise, if the user just handed you a rich, specific fact from a
      phase that isn't `currentPhase` (see above), you may ask one genuine
      follow-up about it instead of the current phase's field — but only once,

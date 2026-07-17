@@ -13,6 +13,9 @@
 | **Profile field** | Одна единица собираемой информации (например `mainConcern`) со статусом, значением, уверенностью и цитатой-доказательством | `domain/interviewProfile.ts` |
 | **Field status** | `known` — подтверждено и сохранено; `missing` — ещё не обсуждалось; `deferred` — пользователь сознательно пропустил | `domain/interviewProfile.ts` |
 | **Open thread** | Тема, которую пользователь затронул, но не раскрыл до конца — источник следующего уточняющего вопроса | `domain/interviewProfile.ts` |
+| **Display name** | Ник пользователя из Telegram (`first_name`/`username`), взятый один раз на `/start` — идентичность, а не факт, извлечённый интервью-движком, поэтому не участвует в `applyInterviewUpdate`/каталоге полей | `domain/interviewProfile.ts` (`InterviewProfile.displayName`), `transport/telegramHandlers.ts` |
+| **Phase narrative** | Label фазы (для прогресс-строки) + для переходов без своего LLM-отражения (`impact`/`support`/`readiness`) — статичная one-line причина "почему эта фаза" | `domain/interviewProfile.ts` (`PHASE_NARRATIVE`) |
+| **Category progress** | Прогресс по текущей фазе интервью (`Phase 3/5 — History: 2/5`), а не по общему числу вопросов — интервью адаптивное, один ход закрывает 0/1/несколько полей | `domain/interviewProfile.ts` (`formatCategoryProgress`) |
 | **Interview engine** | LLM-порт, который по последнему ответу пользователя обновляет поля профиля и генерирует следующий вопрос | `application/ports/interviewEnginePort.ts` |
 | **Correction path** | Механизм: новое значение конфликтует с уже `known`-полем → не перезаписывается молча, следующий вопрос — подтверждение/исправление | `domain/interviewProfile.ts` (`applyInterviewUpdate`) |
 | **Analytics event** | Структурированная запись о продуктовом событии (`events` таблица) — только категории/числа/ключи полей, никогда raw text (CLAUDE.md §5) | `application/ports/analyticsEventPort.ts`, `infrastructure/sqlite/analyticsEventRepository.ts` |

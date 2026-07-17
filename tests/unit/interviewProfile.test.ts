@@ -5,6 +5,8 @@ import {
   createEmptyProfile,
   onlyDemographicFieldsRemaining,
   fieldsTransitionedToKnown,
+  formatCategoryProgress,
+  PROFILE_FIELD_CATALOG,
   type InterviewProfile,
 } from '../../src/domain/interviewProfile.js';
 
@@ -103,6 +105,7 @@ test('advances to the impact phase once every intro field is known or deferred',
       { key: 'age', status: 'known', value: '34', confidence: 0.9 },
       { key: 'gender', status: 'known', value: 'female', confidence: 0.9 },
       { key: 'weight', status: 'deferred', confidence: 0.9 },
+      { key: 'height', status: 'deferred', confidence: 0.9 },
     ],
     openThreads: [],
   });
@@ -151,4 +154,65 @@ test('fieldsTransitionedToKnown ignores a field that was already known before th
   });
 
   assert.deepEqual(fieldsTransitionedToKnown(before, after), []);
+});
+
+test('createEmptyProfile stores the given displayName', () => {
+  const profile = createEmptyProfile('user-1', 'Alex');
+  assert.equal(profile.displayName, 'Alex');
+});
+
+test('createEmptyProfile leaves displayName undefined when none is given', () => {
+  const profile = createEmptyProfile('user-1');
+  assert.equal(profile.displayName, undefined);
+});
+
+test('applyInterviewUpdate carries displayName through the merge, unaffected by field updates', () => {
+  const current = createEmptyProfile('user-1', 'Alex');
+
+  const { profile } = applyInterviewUpdate(current, {
+    fields: [{ key: 'mainConcern', status: 'known', value: 'back pain', confidence: 0.9 }],
+    openThreads: [],
+  });
+
+  assert.equal(profile.displayName, 'Alex');
+});
+
+test('the intro phase catalog includes height alongside age/gender/weight', () => {
+  const introKeys = PROFILE_FIELD_CATALOG.filter((field) => field.phase === 'intro').map((field) => field.key);
+  assert.ok(introKeys.includes('height'));
+});
+
+test('formatCategoryProgress reports closed/total within the current phase mid-phase', () => {
+  const profile: InterviewProfile = {
+    userId: 'user-1',
+    fields: [
+      { key: 'triedSoFar', status: 'known', value: 'physio', confidence: 0.9 },
+      { key: 'whyPastAttemptsFailed', status: 'known', value: 'gave up', confidence: 0.9 },
+    ],
+    openThreads: [],
+    currentPhase: 'history',
+  };
+
+  assert.equal(formatCategoryProgress(profile), 'Phase 3/5 — History: 2/5');
+});
+
+test('formatCategoryProgress reports a full count right at the boundary of a phase closing', () => {
+  const profile: InterviewProfile = {
+    userId: 'user-1',
+    fields: [
+      { key: 'severityOrImpact', status: 'known', value: 'a lot', confidence: 0.9 },
+      { key: 'activitiesGivenUp', status: 'known', value: 'gym', confidence: 0.9 },
+      { key: 'impactOnRelationshipsAndConfidence', status: 'known', value: 'less confidence', confidence: 0.9 },
+      { key: 'roleOfProblemNow', status: 'deferred' },
+    ],
+    openThreads: [],
+    currentPhase: 'impact',
+  };
+
+  assert.equal(formatCategoryProgress(profile), 'Phase 2/5 — Impact: 4/4');
+});
+
+test('formatCategoryProgress is empty once the interview reaches the terminal synthesis phase', () => {
+  const profile: InterviewProfile = { ...createEmptyProfile('user-1'), currentPhase: 'synthesis' };
+  assert.equal(formatCategoryProgress(profile), '');
 });

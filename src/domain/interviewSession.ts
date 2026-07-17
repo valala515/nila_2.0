@@ -5,6 +5,6 @@ export interface InterviewSession {
   readonly status: InterviewSessionStatus;
 }
 
-export function startInterviewSession(userId: string): InterviewSession {
-  return { userId, status: 'not_started' };
+export function startInterviewSession(userId: string, hasExistingProfile: boolean): InterviewSession {
+  return { userId, status: hasExistingProfile ? 'in_progress' : 'not_started' };
 }

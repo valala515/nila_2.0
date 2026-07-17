@@ -12,8 +12,7 @@ import type { PendingFeedbackRepository } from '../application/ports/pendingFeed
 import type { SessionPort } from '../application/ports/sessionPort.js';
 import type { InterviewProfile } from '../domain/interviewProfile.js';
 import type { QuickRepliesKind } from '../domain/interviewReply.js';
-import { startInterviewSession } from '../domain/interviewSession.js';
-import { buildGreeting } from '../application/useCases/greetNewUser.js';
+import { prepareGreeting } from '../application/useCases/greetNewUser.js';
 import { advanceInterview, type AdvanceInterviewResult } from '../application/useCases/advanceInterview.js';
 import { submitExperienceRating, type ExperienceRatingChoice } from '../application/useCases/collectInterviewFeedback.js';
 
@@ -91,8 +90,8 @@ async function handleCallbackQuery(ctx: Context & { callbackQuery: { data: strin
 export function registerTelegramHandlers(bot: Bot, deps: TelegramHandlerDependencies): void {
   bot.command('start', async (ctx) => {
     const userId = String(ctx.from?.id ?? ctx.chat.id);
-    const interviewSession = startInterviewSession(userId);
-    const greeting = buildGreeting(interviewSession);
+    const displayName = ctx.from?.first_name || ctx.from?.username;
+    const greeting = await prepareGreeting(userId, displayName, deps);
     await deps.analyticsEvent.record('interview_started', userId, {});
     const sessionId = await deps.session.openNewSession(userId);
     await deps.session.recordBotMessage(sessionId, userId, greeting);

@@ -11,6 +11,7 @@ export const PROFILE_FIELD_CATALOG = [
   { key: 'age', description: "the user's age", phase: 'intro' },
   { key: 'gender', description: "the user's gender", phase: 'intro' },
   { key: 'weight', description: "the user's weight — okay to defer if the user doesn't want to share it", phase: 'intro' },
+  { key: 'height', description: "the user's height — okay to defer if the user doesn't want to share it", phase: 'intro' },
 
   // impact — what the problem took from the person
   { key: 'severityOrImpact', description: 'how much this affects daily life', phase: 'impact' },
@@ -51,7 +52,30 @@ export type FieldStatus = 'known' | 'missing' | 'deferred';
 export const INTERVIEW_PHASE_ORDER = ['intro', 'impact', 'history', 'support', 'readiness', 'synthesis'] as const;
 export type InterviewPhase = (typeof INTERVIEW_PHASE_ORDER)[number];
 
-const DEMOGRAPHIC_FIELD_KEYS: readonly ProfileFieldKey[] = ['age', 'gender', 'weight'];
+const DEMOGRAPHIC_FIELD_KEYS: readonly ProfileFieldKey[] = ['age', 'gender', 'weight', 'height'];
+
+// label — для всех 5 нетерминальных фаз (прогресс-строка); purpose — только для
+// переходов без своего LLM-отражения (impact/support/readiness). 'history' уже
+// покрыт checkpointReflection.ts, 'intro' не имеет входа-перехода.
+export const PHASE_NARRATIVE: Record<Exclude<InterviewPhase, 'synthesis'>, { readonly label: string; readonly purpose?: string }> = {
+  intro: { label: 'Intro' },
+  impact: {
+    label: 'Impact',
+    purpose:
+      "Now that I know what's going on, I want to understand how it's actually been affecting your day-to-day — that's what tells me which kind of help would actually matter.",
+  },
+  history: { label: 'History' },
+  support: {
+    label: 'Support',
+    purpose:
+      'This next part is about how you want to be supported — everyone hears feedback differently, and getting this right means I won\'t accidentally sound preachy or miss the mark.',
+  },
+  readiness: {
+    label: 'Readiness',
+    purpose:
+      "Last stretch — I want to know what you're actually ready to try right now, so anything I suggest later fits where you are, not where I assume you should be.",
+  },
+};
 
 export interface ProfileField {
   readonly key: ProfileFieldKey;
@@ -71,15 +95,22 @@ export interface InterviewProfile {
   readonly fields: ProfileField[];
   readonly openThreads: OpenThread[];
   readonly currentPhase: InterviewPhase;
+  /** Telegram nickname (first_name/username) — identity, not an interview-extracted fact; see greetNewUser.ts. */
+  readonly displayName?: string;
 }
 
-export function createEmptyProfile(userId: string): InterviewProfile {
+export function createEmptyProfile(userId: string, displayName?: string): InterviewProfile {
   return {
     userId,
     fields: PROFILE_FIELD_CATALOG.map(({ key }) => ({ key, status: 'missing' as const })),
     openThreads: [],
     currentPhase: INTERVIEW_PHASE_ORDER[0],
+    ...(displayName !== undefined ? { displayName } : {}),
   };
+}
+
+function fieldKeysInPhase(phase: InterviewPhase): ProfileFieldKey[] {
+  return PROFILE_FIELD_CATALOG.filter((field) => field.phase === phase).map((field) => field.key);
 }
 
 /**
@@ -89,7 +120,7 @@ export function createEmptyProfile(userId: string): InterviewProfile {
  * Разрешённые side effects: нет (чистая функция)
  */
 export function missingFieldsInPhase(profile: InterviewProfile, phase: InterviewPhase): ProfileFieldKey[] {
-  const phaseKeys = PROFILE_FIELD_CATALOG.filter((field) => field.phase === phase).map((field) => field.key);
+  const phaseKeys = fieldKeysInPhase(phase);
   const statusByKey = new Map(profile.fields.map((field) => [field.key, field.status]));
   return phaseKeys.filter((key) => (statusByKey.get(key) ?? 'missing') === 'missing');
 }
@@ -227,6 +258,7 @@ export function applyInterviewUpdate(current: InterviewProfile, update: ProfileU
     fields: [...fieldsByKey.values()],
     openThreads: update.openThreads,
     currentPhase: current.currentPhase,
+    ...(current.displayName !== undefined ? { displayName: current.displayName } : {}),
   };
 
   return {
@@ -251,4 +283,41 @@ export function describeContradiction(profileBeforeMerge: InterviewProfile, conf
   const oldValue = profileBeforeMerge.fields.find((field) => field.key === conflict.key)?.value ?? '';
   const newValue = conflict.value ?? '';
   return `Quick check — earlier you said "${oldValue}" about ${describeFieldForContradiction(conflict.key)}, but now it sounds like "${newValue}". Which one is accurate right now?`;
+}
+
+const NARRATED_PHASE_COUNT = INTERVIEW_PHASE_ORDER.length - 1; // все, кроме терминальной 'synthesis'
+
+/**
+ * SPEC: formatCategoryProgress
+ * Назначение: показать пользователю прогресс по текущей фазе интервью, а не
+ *   по общему числу вопросов — интервью адаптивное (interviewEngine.v4.md),
+ *   один ход может закрыть 0/1/несколько полей, поэтому "вопрос 7 из 25"
+ *   расходился бы с реальностью.
+ * Входы/Выход: профиль → готовая для показа пользователю строка вида
+ *   "Phase 3/5 — History: 2/5"; для терминальной фазы 'synthesis' — пустая
+ *   строка (прогресс неактуален, интервью уже завершено).
+ * Разрешённые side effects: нет (чистая функция)
+ */
+export function formatCategoryProgress(profile: InterviewProfile): string {
+  const phase = profile.currentPhase;
+  if (phase === 'synthesis') return '';
+
+  const total = fieldKeysInPhase(phase).length;
+  const closed = total - missingFieldsInPhase(profile, phase).length;
+  const phaseIndex = INTERVIEW_PHASE_ORDER.indexOf(phase) + 1;
+  return `Phase ${phaseIndex}/${NARRATED_PHASE_COUNT} — ${PHASE_NARRATIVE[phase].label}: ${closed}/${total}`;
+}
+
+/**
+ * SPEC: appendCategoryProgress
+ * Назначение: единая точка склейки текста ответа с прогресс-строкой — общая
+ *   для greetNewUser.ts (welcome back) и advanceInterview.ts (суффикс к
+ *   ответу интервью), чтобы формат склейки не расходился между двумя местами.
+ * Входы/Выход: готовый текст + профиль → текст, при пустом прогрессе (фаза
+ *   'synthesis') возвращается без изменений
+ * Разрешённые side effects: нет (чистая функция)
+ */
+export function appendCategoryProgress(text: string, profile: InterviewProfile): string {
+  const progress = formatCategoryProgress(profile);
+  return progress ? `${text}\n\n${progress}` : text;
 }

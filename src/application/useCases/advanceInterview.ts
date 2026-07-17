@@ -3,9 +3,12 @@ import { requestInterviewFeedback } from './collectInterviewFeedback.js';
 import {
   createEmptyProfile,
   applyInterviewUpdate,
+  appendCategoryProgress,
   describeContradiction,
   fieldsTransitionedToKnown,
   isInterviewComplete,
+  PHASE_NARRATIVE,
+  type InterviewPhase,
   type InterviewProfile,
   type ProfileField,
 } from '../../domain/interviewProfile.js';
@@ -36,6 +39,14 @@ export interface AdvanceInterviewResult extends InterviewReplyOutcome {
 interface ResolvedReply {
   readonly text: string;
   readonly quickReplies: QuickRepliesKind;
+}
+
+// Переходы без своего LLM-отражения (history уже покрыт checkpointReflection.ts,
+// intro не имеет входа-перехода) — получают статичную one-line "почему эта фаза".
+// Выводится из PHASE_NARRATIVE (наличие purpose), а не из отдельного хардкода
+// списка фаз, чтобы обе стороны не могли разойтись.
+function isNarratedPhase(phase: InterviewPhase): phase is Exclude<InterviewPhase, 'synthesis'> {
+  return phase !== 'synthesis' && PHASE_NARRATIVE[phase].purpose !== undefined;
 }
 
 interface TurnOutcome {
@@ -97,11 +108,16 @@ async function recordSessionProgress(outcome: TurnOutcome, session: SessionPort)
 /**
  * SPEC: resolveReply
  * Назначение: выбрать текст ответа пользователю по итогам хода — уточнение
- *   при contradiction, checkpoint-отражение на impact→history, felt-heard
- *   опрос на первом входе в synthesis, иначе обычный nextQuestion от engine.
- *   Квикреплаи (👍/👎) показываются только под felt-heard опросом — решение
- *   пользователя 16 июля после живого теста в Telegram: кнопки под каждым
- *   вопросом интервью оказались избыточны (см. docs/sprint-plan.md).
+ *   при contradiction, checkpoint-отражение на impact→history, статичная
+ *   one-line "почему эта фаза" (PHASE_NARRATIVE.purpose) на входе в impact/
+ *   support/readiness, felt-heard опрос на первом входе в synthesis, иначе
+ *   обычный nextQuestion от engine. Квикреплаи (👍/👎) показываются только под
+ *   felt-heard опросом — решение пользователя 16 июля после живого теста в
+ *   Telegram: кнопки под каждым вопросом интервью оказались избыточны (см.
+ *   docs/sprint-plan.md). Суффикс appendCategoryProgress добавляется прямо в
+ *   этой функции — везде, кроме conflict и felt-heard опроса, где прогресс
+ *   неуместен — так возвращённый текст уже финальный, без отдельного
+ *   пост-обработки шага в advanceInterview.
  * Входы/Выход: TurnOutcome + AdvanceInterviewDeps → { text, quickReplies }
  * Разрешённые side effects: CheckpointReflectionPort.reflect, AnalyticsEventPort.record
  *   ('interview_completed'), PendingFeedbackRepository.setPending (через requestInterviewFeedback)
@@ -115,7 +131,7 @@ async function resolveReply(outcome: TurnOutcome, deps: AdvanceInterviewDeps): P
   const enteredHistoryPhase = outcome.before.currentPhase === 'impact' && outcome.after.currentPhase === 'history';
   if (enteredHistoryPhase) {
     const text = await deps.checkpointReflection.reflect(outcome.after, outcome.recentTurns);
-    return { text, quickReplies: 'none' };
+    return { text: appendCategoryProgress(text, outcome.after), quickReplies: 'none' };
   }
 
   const enteredSynthesisPhase = !isInterviewComplete(outcome.before) && isInterviewComplete(outcome.after);
@@ -125,7 +141,13 @@ async function resolveReply(outcome: TurnOutcome, deps: AdvanceInterviewDeps): P
     return { text, quickReplies: 'experience' };
   }
 
-  return { text: outcome.result.nextQuestion, quickReplies: 'none' };
+  if (outcome.before.currentPhase !== outcome.after.currentPhase && isNarratedPhase(outcome.after.currentPhase)) {
+    const purpose = PHASE_NARRATIVE[outcome.after.currentPhase].purpose;
+    const text = `${purpose} ${outcome.result.nextQuestion}`;
+    return { text: appendCategoryProgress(text, outcome.after), quickReplies: 'none' };
+  }
+
+  return { text: appendCategoryProgress(outcome.result.nextQuestion, outcome.after), quickReplies: 'none' };
 }
 
 /**
@@ -148,7 +170,12 @@ async function resolveReply(outcome: TurnOutcome, deps: AdvanceInterviewDeps): P
  *   Ровно на ходу, где currentPhase меняется с 'impact' на 'history', вместо
  *   обычного nextQuestion от engine возвращается checkpoint-отражение —
  *   единое сообщение (reflection + переход в первый вопрос history), не два
- *   сообщения подряд.
+ *   сообщения подряд. На ходу, где currentPhase меняется на 'impact'/'support'/
+ *   'readiness', перед nextQuestion добавляется статичная one-line
+ *   PHASE_NARRATIVE.purpose. Суффикс appendCategoryProgress уже включён в
+ *   text, который вернул resolveReply (см. его SPEC) — сохранённый в
+ *   bot_messages текст совпадает с отправленным пользователю без
+ *   дополнительного шага здесь.
  * Запрещено: логировать text/value полей за пределами processUserUtterance/
  *   InterviewProfileRepository (CLAUDE.md §5).
  */
