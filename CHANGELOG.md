@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/valala515/nila_2.0/compare/v1.2.0...v1.3.0) (2026-07-17)
+
+
+### Features
+
+* **interview:** прогресс по фазам и никнейм из Telegram вместо имени ([9d54272](https://github.com/valala515/nila_2.0/commit/9d5427277849204982761ec74740a1404720aa01))
+
 # [1.2.0](https://github.com/valala515/nila_2.0/compare/v1.1.0...v1.2.0) (2026-07-16)
 
 
