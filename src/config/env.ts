@@ -9,6 +9,15 @@ const envSchema = z.object({
   DASHBOARD_TOKEN: z.string().min(1, 'DASHBOARD_TOKEN is required'),
   DASHBOARD_PORT: z.coerce.number().int().positive().default(3001),
   DASHBOARD_STATIC_DIR: z.string().min(1).default('./dashboard/dist'),
+  // Только для ручного QA живого интервью в Telegram (см.
+  // infrastructure/testing/testModeInterviewEngine.ts) — allowlisted userId
+  // может пройти всё интервью любыми ответами, минуя реальный OpenAI-движок.
+  // Пусто по умолчанию — обычные пользователи не затронуты.
+  INTERVIEW_TEST_MODE_USER_IDS: z
+    .string()
+    .optional()
+    .default('')
+    .transform((value) => value.split(',').map((id) => id.trim()).filter(Boolean)),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -7,6 +7,7 @@ import { createOpenAiClient } from './infrastructure/openai/client.js';
 import { createSpeechToText } from './infrastructure/openai/speechToText.js';
 import { createToneAnalyzer } from './infrastructure/openai/toneAnalyzer.js';
 import { createInterviewEngine } from './infrastructure/openai/interviewEngine.js';
+import { createTestModeInterviewEngine } from './infrastructure/testing/testModeInterviewEngine.js';
 import { createCheckpointReflection } from './infrastructure/openai/checkpointReflection.js';
 import { createDatabase } from './infrastructure/sqlite/db.js';
 import { createTurnRepository } from './infrastructure/sqlite/turnRepository.js';
@@ -44,7 +45,7 @@ registerTelegramHandlers(bot, {
   speechToText: createSpeechToText(openAiClient, analyticsEvent),
   toneAnalysis: createToneAnalyzer(openAiClient),
   turnRepository: createTurnRepository(db),
-  interviewEngine: createInterviewEngine(openAiClient, analyticsEvent),
+  interviewEngine: createTestModeInterviewEngine(createInterviewEngine(openAiClient, analyticsEvent), env.INTERVIEW_TEST_MODE_USER_IDS),
   interviewProfileRepository,
   checkpointReflection: createCheckpointReflection(openAiClient, analyticsEvent),
   analyticsEvent,
