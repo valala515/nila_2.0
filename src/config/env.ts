@@ -18,6 +18,16 @@ const envSchema = z.object({
     .optional()
     .default('')
     .transform((value) => value.split(',').map((id) => id.trim()).filter(Boolean)),
+  // Статика Telegram Mini App экрана профиля (src/transport/miniapp, см.
+  // getProfileForMiniApp.ts) — рукописные HTML/CSS/JS, без сборки, поэтому
+  // путь смотрит прямо в miniapp/public, а не в dist-каталог, в отличие от
+  // DASHBOARD_STATIC_DIR (там отдельный Vite-проект).
+  MINIAPP_STATIC_DIR: z.string().min(1).default('./miniapp/public'),
+  // Публичный https-URL для Menu Button (web_app) — обычно dev-туннель
+  // (cloudflared/ngrok) на этапе разработки. Пусто по умолчанию — Menu Button
+  // остаётся обычной (без web_app), сам /api/profile при этом всё равно
+  // доступен и тестируем напрямую (graceful degradation).
+  TELEGRAM_WEBAPP_URL: z.string().optional().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { getDashboardMetrics } from '../application/useCases/getDashboardMetrics.js';
 import { resetUserSession, deleteUserHistory, type ManageUserHistoryDeps } from '../application/useCases/manageUserHistory.js';
+import { getProfileForMiniApp } from '../application/useCases/getProfileForMiniApp.js';
 import { matchesConversationsRoute, handleConversationsRoute } from './conversationsApi.js';
+import { verifyInitData } from '../infrastructure/telegram/initDataValidation.js';
 import type { AnalyticsQueryPort } from '../application/ports/analyticsQueryPort.js';
 import type { ConversationsQueryPort } from '../application/ports/conversationsQueryPort.js';
 
@@ -13,6 +15,8 @@ export interface DashboardApiDeps {
   userHistory: ManageUserHistoryDeps;
   token: string;
   staticDir: string;
+  telegramBotToken: string;
+  miniAppStaticDir: string;
 }
 
 const DEFAULT_WINDOW_DAYS = 30;
@@ -87,6 +91,34 @@ async function handleUserHistoryAction(
   sendJson(res, 200, { ok: true });
 }
 
+function bearerFromTma(authorization: string | undefined): string | null {
+  return authorization?.startsWith('tma ') ? authorization.slice('tma '.length) : null;
+}
+
+/**
+ * SPEC: handleMiniAppProfile
+ * Назначение: GET /api/profile для Telegram Mini App (src/transport/miniapp) —
+ *   отдельная auth-ветка на verifyInitData, НЕ переиспользует isAuthorized/
+ *   DASHBOARD_TOKEN дашборда (разные механизмы авторизации, см. план Фазы B).
+ * Разрешённые side effects: getProfileForMiniApp (чтение через InterviewProfileRepository)
+ * Инварианты: невалидная/просроченная initData → 401, не 200 с пустым/чужим профилем.
+ */
+async function handleMiniAppProfile(req: IncomingMessage, res: ServerResponse, deps: DashboardApiDeps): Promise<void> {
+  const initData = bearerFromTma(req.headers.authorization);
+  const verified = initData ? verifyInitData(initData, deps.telegramBotToken) : null;
+  if (!verified) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return;
+  }
+
+  const profile = await getProfileForMiniApp(verified.userId, { interviewProfileRepository: deps.userHistory.interviewProfileRepository });
+  if (!profile) {
+    sendJson(res, 404, { error: 'profile_not_found' });
+    return;
+  }
+  sendJson(res, 200, profile);
+}
+
 /**
  * SPEC: resolveStaticPath
  * Назначение: превратить URL-путь в путь к файлу внутри staticDir, не давая
@@ -115,17 +147,43 @@ async function handleStatic(res: ServerResponse, url: URL, staticDir: string): P
   }
 }
 
+function withStrippedPrefix(url: URL, prefix: string): URL {
+  const stripped = new URL(url);
+  stripped.pathname = url.pathname.slice(prefix.length) || '/';
+  return stripped;
+}
+
+function isMiniAppPath(pathname: string): boolean {
+  return pathname === '/miniapp' || pathname.startsWith('/miniapp/');
+}
+
+type RouteHandler = (req: IncomingMessage, res: ServerResponse, url: URL, deps: DashboardApiDeps) => Promise<void>;
+
+// Точные method+path совпадения — отдельно от conversations/static веток ниже,
+// чтобы cyclomatic/cognitive complexity routeRequest не расползалась на одну функцию.
+function matchExactRoute(method: string, pathname: string): RouteHandler | null {
+  if (method === 'GET' && pathname === '/api/dashboard-metrics') return (req, res, url, deps) => handleMetrics(req, res, url, deps);
+  if (method === 'GET' && pathname === '/api/profile') return (req, res, _url, deps) => handleMiniAppProfile(req, res, deps);
+  if (method === 'POST' && pathname === '/api/users/reset') {
+    return (req, res, _url, deps) => handleUserHistoryAction(req, res, deps, resetUserSession);
+  }
+  if (method === 'POST' && pathname === '/api/users/delete') {
+    return (req, res, _url, deps) => handleUserHistoryAction(req, res, deps, deleteUserHistory);
+  }
+  return null;
+}
+
 function routeRequest(req: IncomingMessage, res: ServerResponse, url: URL, deps: DashboardApiDeps): Promise<void> {
   const method = req.method ?? 'GET';
-  if (method === 'GET' && url.pathname === '/api/dashboard-metrics') return handleMetrics(req, res, url, deps);
-  if (method === 'POST' && url.pathname === '/api/users/reset') {
-    return handleUserHistoryAction(req, res, deps, resetUserSession);
-  }
-  if (method === 'POST' && url.pathname === '/api/users/delete') {
-    return handleUserHistoryAction(req, res, deps, deleteUserHistory);
-  }
+
+  const exact = matchExactRoute(method, url.pathname);
+  if (exact) return exact(req, res, url, deps);
+
   if (matchesConversationsRoute(method, url.pathname)) {
     return handleConversationsRoute(req, res, url, { conversationsQuery: deps.conversationsQuery, token: deps.token });
+  }
+  if (method === 'GET' && isMiniAppPath(url.pathname)) {
+    return handleStatic(res, withStrippedPrefix(url, '/miniapp'), deps.miniAppStaticDir);
   }
   return handleStatic(res, url, deps.staticDir);
 }

@@ -70,9 +70,17 @@ const dashboardApi = createDashboardApi({
   },
   token: env.DASHBOARD_TOKEN,
   staticDir: env.DASHBOARD_STATIC_DIR,
+  telegramBotToken: env.TELEGRAM_BOT_TOKEN,
+  miniAppStaticDir: env.MINIAPP_STATIC_DIR,
 });
 dashboardApi.listen(env.DASHBOARD_PORT, () => {
   console.log(`Dashboard API listening on port ${env.DASHBOARD_PORT}`);
+});
+
+await bot.api.setChatMenuButton({
+  menu_button: env.TELEGRAM_WEBAPP_URL
+    ? { type: 'web_app', text: 'My Profile', web_app: { url: env.TELEGRAM_WEBAPP_URL } }
+    : { type: 'default' },
 });
 
 await bot.start();

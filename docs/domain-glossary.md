@@ -30,6 +30,8 @@
 | **Course topic** | Один из 8 детерминированных тематических кластеров курса (nutrition_gut, sleep_rest, stress_anxiety, parenting_child, movement_mobility, pain_recovery, beauty_anti_aging, creativity_spirituality) — присваивается при синхронизации (index-time enrichment), не пересчитывается на каждый запрос | `domain/courseTopic.ts` (`classifyCourseTopics`) |
 | **Course catalog sync** | Получение полного каталога NMS через `CourseCatalogPort`, классификация тем и сохранение в SQLite (`pnpm run courses:sync`) | `application/useCases/syncCourseCatalog.ts` |
 | **Course recommendation** | Топ-N курсов каталога, отранжированных по текстовому запросу (keyword-скоринг + audience guard + topic boost) — движок готов, но пока не подключён ни к одному transport (проактивный советник — Sprint 4, `docs/sprint-plan.md`) | `domain/courseRecommendation.ts` (`rankCourses`), `application/useCases/recommendCourses.ts` |
+| **Verified init data** | Результат проверки подписи Telegram Mini App `initData` (HMAC-SHA256 по алгоритму Telegram) — `{ userId }` при валидной и свежей (`auth_date` не старше maxAgeSeconds) подписи, иначе `null`; отдельная auth-ветка от Bearer-токена дашборда | `infrastructure/telegram/initDataValidation.ts` (`verifyInitData`) |
+| **Mini App profile view model** | View-model экрана профиля Mini App: прогресс по 5 фазам (`closedFields`/`totalFields`/`isCurrent`/`isDone`) + список известных фактов (`known`-поля со значением, `description` из каталога) — deferred/missing поля в facts не попадают | `application/useCases/getProfileForMiniApp.ts` |
 
 Соответствие со сводом (`docs/input/...`): «completeness map» свода = множество
 `ProfileField.status` по всем полям; «open threads» — как в своде, без изменений.

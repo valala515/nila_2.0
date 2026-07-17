@@ -7,8 +7,9 @@ import prettier from 'eslint-config-prettier';
 export default tseslint.config(
   {
     // "**/" — dist/node_modules внутри dashboard/ (отдельный Vite-пакет) тоже игнорируются,
-    // не только на корне репозитория.
-    ignores: ['**/dist/**', '**/node_modules/**'],
+    // не только на корне репозитория. miniapp/public — рукописный статический
+    // браузерный JS без сборки (см. src/transport/miniapp), вне TS-пайплайна проекта.
+    ignores: ['**/dist/**', '**/node_modules/**', 'miniapp/public/**'],
   },
   {
     files: ['*.cjs'],
