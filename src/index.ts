@@ -51,6 +51,7 @@ registerTelegramHandlers(bot, {
   analyticsEvent,
   pendingFeedback,
   session,
+  allowedChatIds: env.ALLOWED_CHAT_IDS,
 });
 
 bot.catch((err) => {

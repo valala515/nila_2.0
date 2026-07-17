@@ -28,9 +28,23 @@ export interface TelegramHandlerDependencies {
   analyticsEvent: AnalyticsEventPort;
   pendingFeedback: PendingFeedbackRepository;
   session: SessionPort;
+  allowedChatIds: ReadonlySet<string>;
 }
 
 const EXPERIENCE_RATING_CALLBACK = /^xr:(up|down)$/;
+const ALLOWLIST_DENIED_MESSAGE = 'This bot is currently invite-only.';
+
+/**
+ * SPEC: isChatAllowed
+ * Назначение: инвайт-only гейт перед dogfood — пустой allowlist = без
+ *   ограничений (текущий dev-режим), непустой = пропускает только
+ *   перечисленные chat.id.
+ * Входы/Выход: chatId + allowlist → boolean
+ * Разрешённые side effects: нет (чистая функция)
+ */
+export function isChatAllowed(chatId: string, allowedChatIds: ReadonlySet<string>): boolean {
+  return allowedChatIds.size === 0 || allowedChatIds.has(chatId);
+}
 
 // Только ключи и статусы (known/missing/deferred) — без values и evidence-quote,
 // чтобы отладочная команда не выводила сырой текст пользователя (CLAUDE.md §5).
@@ -88,6 +102,15 @@ async function handleCallbackQuery(ctx: Context & { callbackQuery: { data: strin
 }
 
 export function registerTelegramHandlers(bot: Bot, deps: TelegramHandlerDependencies): void {
+  bot.use(async (ctx, next) => {
+    const chatId = String(ctx.chat?.id ?? ctx.from?.id);
+    if (isChatAllowed(chatId, deps.allowedChatIds)) {
+      await next();
+      return;
+    }
+    if (ctx.chat) await deps.messaging.sendText(String(ctx.chat.id), ALLOWLIST_DENIED_MESSAGE);
+  });
+
   bot.command('start', async (ctx) => {
     const userId = String(ctx.from?.id ?? ctx.chat.id);
     const displayName = ctx.from?.first_name || ctx.from?.username;

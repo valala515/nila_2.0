@@ -28,6 +28,16 @@ const envSchema = z.object({
   // остаётся обычной (без web_app), сам /api/profile при этом всё равно
   // доступен и тестируем напрямую (graceful degradation).
   TELEGRAM_WEBAPP_URL: z.string().optional().default(''),
+  // Comma-separated Telegram chat id — invite-only gate до открытия dogfood
+  // всем подряд. Пусто по умолчанию = без ограничений (текущий этап — один
+  // тестер). Долгосрочно статический список заменит проверка "привязан ли
+  // chat.id к аккаунту newmindstart" (см. docs/sprint-plan.md), см. также
+  // docs/adr про account linking, когда он появится.
+  ALLOWED_CHAT_IDS: z
+    .string()
+    .optional()
+    .default('')
+    .transform((value) => new Set(value.split(',').map((id) => id.trim()).filter(Boolean))),
 });
 
 export type Env = z.infer<typeof envSchema>;
