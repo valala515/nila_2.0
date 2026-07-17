@@ -1,0 +1,9 @@
+node_modules
+dist
+data
+*.sqlite*
+.env
+.env.*
+!.env.example
+dashboard/node_modules
+dashboard/dist
