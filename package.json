@@ -1,6 +1,6 @@
 {
   "name": "nila_2.0",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Nila AI / The You Who Made It — Telegram-first wellness companion",
   "type": "module",
   "main": "dist/index.js",

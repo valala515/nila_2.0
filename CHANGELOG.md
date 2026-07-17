@@ -1,3 +1,13 @@
+# [1.4.0](https://github.com/valala515/nila_2.0/compare/v1.3.0...v1.4.0) (2026-07-17)
+
+
+### Features
+
+* **interview:** HTML-приветствие и dot-прогрессбар вместо текстового счётчика ([9fa381b](https://github.com/valala515/nila_2.0/commit/9fa381bf5b580eb508c03b24c13356e852ac67a2))
+* **miniapp:** Telegram Mini App экран профиля ([827d106](https://github.com/valala515/nila_2.0/commit/827d1069caa5943538f5c35f10aa154966934ea5))
+* **telegram:** allowlist по chat.id перед dogfood ([982e92d](https://github.com/valala515/nila_2.0/commit/982e92d64ee74bf0976994198552d6afdfbab4b1))
+* **testing:** движок-заглушка для ручного QA интервью ([6309681](https://github.com/valala515/nila_2.0/commit/63096813a72f63d9b0c96ac3804d7f219eb725b8))
+
 # [1.3.0](https://github.com/valala515/nila_2.0/compare/v1.2.0...v1.3.0) (2026-07-17)
 
 
