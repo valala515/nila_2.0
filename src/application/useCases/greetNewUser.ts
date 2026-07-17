@@ -2,26 +2,39 @@ import { startInterviewSession, type InterviewSession } from '../../domain/inter
 import { appendCategoryProgress, createEmptyProfile, type InterviewProfile } from '../../domain/interviewProfile.js';
 import type { InterviewProfileRepository } from '../ports/interviewProfileRepository.js';
 
+// Отправляется с parseMode: 'HTML' (см. bot.command('start', ...) в
+// telegramHandlers.ts) — displayName приходит из Telegram first_name/username,
+// который пользователь полностью контролирует, поэтому экранируем перед
+// подстановкой, иначе "<"/"&" в нике сломали бы разбор Telegram-разметки.
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /**
  * SPEC: buildGreeting
  * Назначение: приветствие на /start — разное для нового и возвращающегося
- *   пользователя (см. InterviewSessionStatus).
+ *   пользователя (см. InterviewSessionStatus). Возвращает Telegram HTML-разметку
+ *   (<b>...</b>) — вызывающий код обязан отправлять с parseMode: 'HTML'.
  * Входы/Выход: session (not_started vs in_progress/awaiting_confirmation) +
  *   профиль (может отсутствовать) → текст приветствия
  * Разрешённые side effects: нет (чистая функция)
  */
 export function buildGreeting(session: InterviewSession, profile: InterviewProfile | null): string {
+  const displayName = profile?.displayName ? escapeHtml(profile.displayName) : undefined;
+
   if (session.status === 'not_started') {
-    const namePrefix = profile?.displayName ? `Hi ${profile.displayName}! ` : 'Hi! ';
+    const namePrefix = displayName ? `Hi ${displayName}! ` : 'Hi! ';
     return (
       `${namePrefix}I'm Nila — I'll ask you a few things about what's going on so I can give you ` +
-      "recommendations that actually fit you, not generic advice. We'll go through it in a few short, " +
-      "focused blocks rather than a long list of questions — and you can reply by text or by voice message, " +
-      'whichever is easier for you. Ready to get started?'
+      "recommendations that actually fit you, not generic advice.\n\n" +
+      "We'll go through it in <b>a few short, focused blocks</b> rather than a long list of questions. " +
+      'Ready to get started?\n\n' +
+      '⸻\n\n' +
+      '🎤 <i>Simply reply with a voice message — no need to type.</i>'
     );
   }
 
-  const nameSuffix = profile?.displayName ? `, ${profile.displayName}` : '';
+  const nameSuffix = displayName ? `, ${displayName}` : '';
   const greeting = `Welcome back${nameSuffix}! Let's pick up where we left off.`;
   return profile ? appendCategoryProgress(greeting, profile) : greeting;
 }

@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from 'grammy';
-import type { MessagingPort, QuickReply } from '../../application/ports/messagingPort.js';
+import type { MessagingPort, QuickReply, SendTextOptions } from '../../application/ports/messagingPort.js';
 import type { VoiceDownloadPort } from '../../application/ports/voiceDownloadPort.js';
 
 export function createTelegramBot(token: string): Bot {
@@ -14,8 +14,8 @@ function buildInlineKeyboard(options: QuickReply[]): InlineKeyboard {
 
 export function createMessagingPort(bot: Bot): MessagingPort {
   return {
-    async sendText(chatId: string, text: string): Promise<void> {
-      await bot.api.sendMessage(chatId, text);
+    async sendText(chatId: string, text: string, options?: SendTextOptions): Promise<void> {
+      await bot.api.sendMessage(chatId, text, options?.parseMode ? { parse_mode: options.parseMode } : undefined);
     },
     async sendTextWithOptions(chatId: string, text: string, options: QuickReply[]): Promise<void> {
       await bot.api.sendMessage(chatId, text, { reply_markup: buildInlineKeyboard(options) });

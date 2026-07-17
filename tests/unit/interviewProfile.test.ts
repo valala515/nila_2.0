@@ -193,7 +193,7 @@ test('formatCategoryProgress reports closed/total within the current phase mid-p
     currentPhase: 'history',
   };
 
-  assert.equal(formatCategoryProgress(profile), 'Phase 3/5 — History: 2/5');
+  assert.equal(formatCategoryProgress(profile), '🟢🟢🟢⚪⚪\nHistory: ▓▓░░░ 2/5');
 });
 
 test('formatCategoryProgress reports a full count right at the boundary of a phase closing', () => {
@@ -209,7 +209,7 @@ test('formatCategoryProgress reports a full count right at the boundary of a pha
     currentPhase: 'impact',
   };
 
-  assert.equal(formatCategoryProgress(profile), 'Phase 2/5 — Impact: 4/4');
+  assert.equal(formatCategoryProgress(profile), '🟢🟢⚪⚪⚪\nImpact: ▓▓▓▓ 4/4');
 });
 
 test('formatCategoryProgress is empty once the interview reaches the terminal synthesis phase', () => {

@@ -95,7 +95,7 @@ export function registerTelegramHandlers(bot: Bot, deps: TelegramHandlerDependen
     await deps.analyticsEvent.record('interview_started', userId, {});
     const sessionId = await deps.session.openNewSession(userId);
     await deps.session.recordBotMessage(sessionId, userId, greeting);
-    await deps.messaging.sendText(String(ctx.chat.id), greeting);
+    await deps.messaging.sendText(String(ctx.chat.id), greeting, { parseMode: 'HTML' });
   });
 
   bot.command('profile', async (ctx) => {

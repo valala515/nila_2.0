@@ -8,8 +8,13 @@ export interface QuickReply {
   readonly label: string;
 }
 
+export interface SendTextOptions {
+  /** 'HTML' — Telegram-разметка (<b>/<i>/...) для текста, который сам вызывающий код собрал и заэкранировал; без этого поля текст отправляется как есть (безопасно для произвольного/LLM-текста). */
+  readonly parseMode?: 'HTML';
+}
+
 export interface MessagingPort {
-  sendText(chatId: string, text: string): Promise<void>;
+  sendText(chatId: string, text: string, options?: SendTextOptions): Promise<void>;
   /** Текст + набор кнопок-вариантов ответа (👍/👎, оценка опыта и т.п.) — без ожидания текстового ввода. */
   sendTextWithOptions(chatId: string, text: string, options: QuickReply[]): Promise<void>;
 }

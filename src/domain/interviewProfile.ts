@@ -287,6 +287,19 @@ export function describeContradiction(profileBeforeMerge: InterviewProfile, conf
 
 const NARRATED_PHASE_COUNT = INTERVIEW_PHASE_ORDER.length - 1; // все, кроме терминальной 'synthesis'
 
+// Текстовые прогресс-бары для Telegram-сообщений (нет доступа к SVG/CSS,
+// только Unicode) — заполненный/пустой символ фазы и символ поля-внутри-фазы
+// сознательно разные, чтобы "3 из 5 фаз" и "2 из 5 полей" не сливались в один
+// визуальный ряд одинаковых точек.
+const PHASE_DONE = '🟢';
+const PHASE_PENDING = '⚪';
+const FIELD_DONE = '▓';
+const FIELD_PENDING = '░';
+
+function renderDots(done: string, pending: string, filled: number, total: number): string {
+  return done.repeat(filled) + pending.repeat(total - filled);
+}
+
 /**
  * SPEC: formatCategoryProgress
  * Назначение: показать пользователю прогресс по текущей фазе интервью, а не
@@ -294,8 +307,9 @@ const NARRATED_PHASE_COUNT = INTERVIEW_PHASE_ORDER.length - 1; // все, кро
  *   один ход может закрыть 0/1/несколько полей, поэтому "вопрос 7 из 25"
  *   расходился бы с реальностью.
  * Входы/Выход: профиль → готовая для показа пользователю строка вида
- *   "Phase 3/5 — History: 2/5"; для терминальной фазы 'synthesis' — пустая
- *   строка (прогресс неактуален, интервью уже завершено).
+ *   "🟢🟢🟢⚪⚪\nHistory: ▓▓░░░ 2/5" (верхняя строка — какая из 5 фаз сейчас,
+ *   нижняя — прогресс полей внутри неё); для терминальной фазы 'synthesis' —
+ *   пустая строка (прогресс неактуален, интервью уже завершено).
  * Разрешённые side effects: нет (чистая функция)
  */
 export function formatCategoryProgress(profile: InterviewProfile): string {
@@ -305,7 +319,9 @@ export function formatCategoryProgress(profile: InterviewProfile): string {
   const total = fieldKeysInPhase(phase).length;
   const closed = total - missingFieldsInPhase(profile, phase).length;
   const phaseIndex = INTERVIEW_PHASE_ORDER.indexOf(phase) + 1;
-  return `Phase ${phaseIndex}/${NARRATED_PHASE_COUNT} — ${PHASE_NARRATIVE[phase].label}: ${closed}/${total}`;
+  const phaseDots = renderDots(PHASE_DONE, PHASE_PENDING, phaseIndex, NARRATED_PHASE_COUNT);
+  const fieldBar = renderDots(FIELD_DONE, FIELD_PENDING, closed, total);
+  return `${phaseDots}\n${PHASE_NARRATIVE[phase].label}: ${fieldBar} ${closed}/${total}`;
 }
 
 /**
